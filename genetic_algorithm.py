@@ -2,10 +2,13 @@ from typing import List, Any, Union
 
 import numpy as np
 from organism import Organism
+from nsga_sort import nsga_sort
 from copy import deepcopy
 
 
 class GeneticAlgorithm:
+    all_species: List[List[int]]
+
     def __init__(self, hparams, problem_params):
         self.hparams = hparams
         self.all_species = list()
@@ -20,20 +23,21 @@ class GeneticAlgorithm:
         self.__speciate_population()
 
     def __assign_species(self, organism_index):
-        was_assigned_species = False
-        for species_index in range(len(self.all_species)):
-            dist = self.population[organism_index].get_distance_from(self.population[self.species_seed_organism[species_index]],
-                                                                     self.hparams['gene_coeff'], self.hparams['weight_coeff'])
-            if dist <= self.hparams['species_threshold']:
-                self.all_species[species_index].append(organism_index)
-                self.population[organism_index].assign_species(species_index)
-                was_assigned_species = True
-                break
-        if not was_assigned_species:
-            self.all_species.append(list([organism_index]))
-            self.species_seed_organism.append(organism_index)
-            self.population[organism_index].assign_species(len(self.all_species)-1)
-            self.population[organism_index].assign_seed()
+        if self.population[organism_index].species_id is None:
+            was_assigned_species = False
+            for species_index in range(len(self.all_species)):
+                dist = self.population[organism_index].get_distance_from(self.population[self.species_seed_organism[species_index]],
+                                                                         self.hparams['gene_coeff'], self.hparams['weight_coeff'])
+                if dist <= self.hparams['species_threshold']:
+                    self.all_species[species_index].append(organism_index)
+                    self.population[organism_index].assign_species(species_index)
+                    was_assigned_species = True
+                    break
+            if not was_assigned_species:
+                self.all_species.append(list([organism_index]))
+                self.species_seed_organism.append(organism_index)
+                self.population[organism_index].assign_species(len(self.all_species)-1)
+                self.population[organism_index].assign_seed()
 
     def best_int_split(self, ratio, total):
         """
@@ -95,46 +99,48 @@ class GeneticAlgorithm:
             total_score = 0.0
             if len(all_species[species_index]) > 0:
                 for organism_index in range(len(all_species[species_index])):
-                    total_score += self.population[organism_index].fitness
+                    total_score += np.sum(self.population[organism_index].fitness)
                 avg_scores[species_index] = total_score / len(all_species[species_index])
 
         offspring_count = self.best_int_split(avg_scores, self.hparams['population_size'])
         return offspring_count
 
-    def __evaluate_population(self):
-        population_fitnesses = np.zeros(len(self.population))
-        for i in range(len(self.population)):
-            self.population[i].assign_fitness(self.problem_params['evaluator'].evaluate_organism(self.population[i]))
-            population_fitnesses[i] = self.population[i].fitness
+    def __evaluate_population(self, population):
+        population_fitnesses = np.zeros((len(population), self.problem_params['evaluator'].get_objective_count()))
+        for i in range(len(population)):
+            population[i].assign_fitness(self.problem_params['evaluator'].evaluate_organism(population[i]))
+            population_fitnesses[i] = population[i].fitness
         return population_fitnesses
 
     def __remove_worst_from_population(self):
-        fitnesses = self.__evaluate_population()
-        remove_cnt = len(self.population) * self.hparams['dieoff_fraction']
-        remove_cnt = int(remove_cnt)
-
-        elite_organisms = list()
-        sorted_indices = np.argsort(fitnesses)
-        for i in range(len(self.population) - remove_cnt):
-            elite_organisms.append(self.population[sorted_indices[i]])
-
-        # Clear all species
-        self.all_species = [[] for _ in range(len(self.all_species))]
-        # self.species_seed_organism = [None] * len(self.species_seed_organism)
-
-        # Fill species with elite organisms
-        for organism_index in range(len(elite_organisms)):
-            species_id = self.population[organism_index].species_id
-            if self.population[organism_index].is_seed_organism:
-                self.species_seed_organism[species_id] = organism_index
-            self.all_species[species_id].append(organism_index)
-
-        # for species_id in range(len(self.all_species)):
-        #     if len(self.all_species[species_id]) > 0 and self.species_seed_organism[species_id] is None:
-        #         self.species_seed_organism = self.population[self.all_species[species_id][0]]
-        self.population = elite_organisms
+        pass
+        # fitnesses = self.__evaluate_population(self.population)
+        # remove_cnt = len(self.population) * self.hparams['dieoff_fraction']
+        # remove_cnt = int(remove_cnt)
+        #
+        # elite_organisms = list()
+        # sorted_indices = np.argsort(fitnesses)
+        # for i in range(len(self.population) - remove_cnt):
+        #     elite_organisms.append(self.population[sorted_indices[i]])
+        #
+        # # Clear all species
+        # self.all_species = [[] for _ in range(len(self.all_species))]
+        # # self.species_seed_organism = [None] * len(self.species_seed_organism)
+        #
+        # # Fill species with elite organisms
+        # for organism_index in range(len(elite_organisms)):
+        #     species_id = self.population[organism_index].species_id
+        #     if self.population[organism_index].is_seed_organism:
+        #         self.species_seed_organism[species_id] = organism_index
+        #     self.all_species[species_id].append(organism_index)
+        #
+        # # for species_id in range(len(self.all_species)):
+        # #     if len(self.all_species[species_id]) > 0 and self.species_seed_organism[species_id] is None:
+        # #         self.species_seed_organism = self.population[self.all_species[species_id][0]]
+        # self.population = elite_organisms
 
     def step_generation(self):
+        self.__evaluate_population(self.population)
         self.__remove_worst_from_population()                                 # Remove the least fit organisms
         offspring_per_species = self.__assign_offspring(self.all_species)     # Assign offspring count to each species
 
@@ -147,12 +153,26 @@ class GeneticAlgorithm:
                     new_organisms.append(organism)
                     new_organisms_species_index.append(species_index)
 
+        self.__evaluate_population(new_organisms)                             # Evaluate new organisms
+        all_organisms = self.population + new_organisms                       # Join the old population with the new population
+        all_scores = np.array([organism.fitness for organism in all_organisms])
+        fronts = nsga_sort(all_scores)                                        # Get fronts from non-domination sort
+        front_organism_index_map: List[List[int]] = [list() for _ in range(max(fronts)+1)]
+        for i in range(len(fronts)):
+            front_organism_index_map[fronts[i]].append(i)
+
         self.all_species = [[] for _ in range(len(self.all_species))]         # Clear all species
         self.population = list()                                              # Clear the population
-        for i in range(len(new_organisms)):
-            self.population.append(new_organisms[i])
-            self.all_species[new_organisms[i].species_id].append(i)
 
-        self.__speciate_population()                                          # Split the newly formed population into species
+        added_cnt = 0
+        while added_cnt < self.hparams['population_size']:                     # Add the best organisms back into the new population
+            for front in front_organism_index_map:
+                to_add = min(self.hparams['population_size'] - added_cnt, len(front))
+                for i in range(to_add):
+                    organism_to_add: Organism = all_organisms[front[i]]
+                    self.population.append(organism_to_add)
+                    self.all_species[organism_to_add.species_id].append(len(self.population) - 1)
+                    added_cnt += 1
 
+        self.__speciate_population()                                           # Assign species to newly added organisms
 

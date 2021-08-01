@@ -1,4 +1,4 @@
-from genetic_algorithm_utility import GeneticAlgorithm
+from genetic_algorithm import GeneticAlgorithm
 from evaluator import Evaluator
 
 hparams = {

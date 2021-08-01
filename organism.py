@@ -84,8 +84,15 @@ class Organism:
     def crossover(self, other_parent):
         fittest_parent = self
         less_fit_parent = other_parent
-        if other_parent.fitness > self.fitness:     # Swap the parents if the ordering was wrong
-            fittest_parent, less_fit_parent = less_fit_parent, fittest_parent
+        # Order the parents if possible
+        if (other_parent.fitness > self.fitness).all():
+            fittest_parent, less_fit_parent = other_parent, self
+        elif (self.fitness > other_parent.fitness).all():
+            fittest_parent, less_fit_parent = self, other_parent
+        else:   # If ordering is not possible choose randomly which parent is more fit
+            if np.random.ranf() < 0.5:
+                fittest_parent, less_fit_parent = other_parent, self
+
 
         child = deepcopy(fittest_parent)
         matching, fitter_intersect_ind, less_fit_intersect_ind = \

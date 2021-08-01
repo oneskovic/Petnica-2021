@@ -4,4 +4,7 @@ class Evaluator:
         self.eval_env = eval_env
 
     def evaluate_organism(self, organism):
-        return np.random.ranf()
+        return np.random.ranf(2)
+
+    def get_objective_count(self):
+        return 2
