@@ -6,8 +6,9 @@ class NeuralNetwork:
 
     def __init__(self, input_size, output_size):
         self.neuron_count = input_size+output_size
-        self.input_neurons = range(0, input_size)
-        self.output_neurons = range(input_size, input_size + output_size)
+        self.input_neurons = np.array(range(0, input_size))
+        self.output_neurons = np.array(range(input_size, input_size + output_size))
+        self.non_output_neurons = np.array(self.input_neurons)
         self.computation_graph = ComputationGraph()
         for _ in range(input_size):
             self.computation_graph.add_node(identity_function)
@@ -29,6 +30,7 @@ class NeuralNetwork:
         self.computation_graph.add_edge(new_node, neuron2, old_weight)
         self.computation_graph.remove_edge(neuron1,neuron2)
         self.neuron_count += 1
+        self.non_output_neurons = np.append(self.non_output_neurons, new_node)
         return new_node
 
     def connect_neurons(self, neuron1, neuron2, weight):
@@ -56,5 +58,11 @@ class NeuralNetwork:
     def get_output_neuron_indices(self):
         return self.output_neurons
 
+    def get_non_output_neurons(self):
+        return self.non_output_neurons
+
     def get_connected_neurons(self, neuron):
         return self.computation_graph.adjacency_list[neuron]
+
+    def get_weight(self, neuron1, index):
+        return self.computation_graph.get_weight_with_index(neuron1, index)

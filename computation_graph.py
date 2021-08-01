@@ -40,6 +40,9 @@ class ComputationGraph:
         index_as_neighbor = self.adjacency_list[node1].index(node2)
         return self.weights[node1][index_as_neighbor]
 
+    def get_weight_with_index(self, node1, index):
+        return self.weights[node1][index]
+
     def set_node_value(self, node, value):
         self.node_values[node] = value
 
