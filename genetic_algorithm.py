@@ -4,6 +4,7 @@ import numpy as np
 from organism import Organism
 from nsga_sort import nsga_sort
 from copy import deepcopy
+import progressbar
 
 
 class GeneticAlgorithm:
@@ -106,10 +107,12 @@ class GeneticAlgorithm:
         return offspring_count
 
     def __evaluate_population(self, population):
+        print('Evaluating population...')
         population_fitnesses = np.zeros((len(population), self.problem_params['evaluator'].get_objective_count()))
-        for i in range(len(population)):
+        for i in progressbar.progressbar(range(len(population))):
             population[i].assign_fitness(self.problem_params['evaluator'].evaluate_organism(population[i]))
             population_fitnesses[i] = population[i].fitness
+        print(' ')
         return population_fitnesses
 
     def __remove_worst_from_population(self):
@@ -175,4 +178,8 @@ class GeneticAlgorithm:
                     added_cnt += 1
 
         self.__speciate_population()                                           # Assign species to newly added organisms
+        total_genome_len = 0
+        for organism in self.population:
+            total_genome_len += len(organism.gene_ids)
+        return total_genome_len / len(self.population)
 
