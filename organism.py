@@ -1,0 +1,86 @@
+import numpy as np
+from recurrent_neural_network import NeuralNetwork
+from activation_functions import all_activation_functions
+from copy import deepcopy
+
+innovation_id_map = dict()
+innovation_counter = 0
+
+
+class Organism:
+    def __init__(self, input_layer_size, output_layer_size):
+        self.neural_net = NeuralNetwork(input_layer_size, output_layer_size)
+        self.gene_ids = np.array(np.arange(input_layer_size * output_layer_size))
+        self.gene_weights = np.random.rand(input_layer_size*output_layer_size)
+        self.start_neuron_cnt = input_layer_size + output_layer_size
+        self.species_id = None
+        self.fitness = None
+        self.is_seed_organism = False
+
+        global innovation_id_map, innovation_counter
+        if innovation_counter == 0:
+            for input_neuron in self.neural_net.get_input_neuron_indices():
+                for output_neuron in self.neural_net.get_output_neuron_indices():
+                    innovation_id_map[(input_neuron, output_neuron)] = innovation_counter
+                    innovation_counter += 1
+
+    def __get_inovation_id(self, neuron1, neuron2):
+        global  innovation_id_map, innovation_counter
+        if (neuron1, neuron2) not in innovation_id_map:
+            innovation_id_map[(neuron1,neuron2)] = innovation_counter
+            innovation_counter += 1
+        return innovation_id_map[(neuron1,neuron2)]
+
+    def assign_to_species(self, species_id):
+        self.species_id = species_id
+
+    def assign_fitness(self, fitness):
+        self.fitness = fitness
+
+    def assign_seed(self):
+        self.is_seed_organism = True
+
+    def get_distance_from(self, other_organism, gene_coeff, weight_coeff):
+        gene_intersection, indices_a, indices_b = np.intersect1d(self.gene_ids, other_organism.gene_ids)
+        different_genes = np.invert(indices_a) + np.invert(indices_b)
+        weight_difference = np.abs(self.gene_weights - other_organism.gene_weights)
+        longest_genome = max(len(self.gene_ids), len(other_organism.gene_ids)) - self.start_neuron_cnt
+        weight_difference = np.mean(weight_difference)
+        different_genes = different_genes / (1+longest_genome)
+        return gene_coeff * different_genes + weight_coeff * weight_difference
+
+    def mutate(self):
+        if np.random.ranf() < 0.5:
+            neuron1 = np.random.randint(self.neural_net.neuron_count)
+            neuron2 = np.random.choice(self.neural_net.get_connected_neurons(neuron1))
+            function = np.random.choice(all_activation_functions)
+            new_neuron = self.neural_net.add_neuron(neuron1, neuron2, function)
+
+            self.gene_ids = np.append(self.gene_ids, self.__get_inovation_id(neuron1, new_neuron))
+            self.gene_ids = np.append(self.gene_ids, self.__get_inovation_id(new_neuron, neuron2))
+
+        else:
+            neuron1 = np.random.randint(self.neural_net.neuron_count)
+            neuron2 = np.random.randint(self.neural_net.neuron_count)
+            self.neural_net.connect_neurons(neuron1, neuron2, np.random.ranf())
+
+            self.gene_ids = np.append(self.gene_ids, self.__get_inovation_id(neuron1, neuron2))
+
+    def crossover(self, other_parent):
+        fittest_parent = self
+        less_fit_parent = other_parent
+        if other_parent.fitness > self.fitness:     # Swap the parents if the ordering was wrong
+            fittest_parent, less_fit_parent = less_fit_parent, fittest_parent
+
+        child = deepcopy(fittest_parent)
+        matching, fitter_intersect_ind, less_fit_intersect_ind = \
+            np.intersect1d(self.gene_ids, other_parent.gene_ids, return_indices=True)
+
+        less_fit_prob = 0.5
+        # Boolean array (0 = should not take weight from less fit organism, 1 = should take)
+        take_less_fit = np.random.rand(len(matching)) < less_fit_prob
+
+        child.gene_weights[fitter_intersect_ind[take_less_fit]] = less_fit_parent.gene_weights[less_fit_intersect_ind[take_less_fit]]
+
+        return child
+
