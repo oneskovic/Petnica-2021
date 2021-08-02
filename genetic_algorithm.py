@@ -1,8 +1,8 @@
-from typing import List, Any, Union
+from typing import List
 
 import numpy as np
 from organism import Organism
-from nsga_sort import nsga_sort
+from utility.nsga_sort import nsga_sort
 from copy import deepcopy
 import progressbar
 
@@ -16,6 +16,7 @@ class GeneticAlgorithm:
         self.species_seed_organism = list()
         self.problem_params = problem_params
         self.__init_population(hparams['population_size'])
+        self.evaluator_list = [deepcopy(self.problem_params['evaluator']) for _ in range(self.hparams['thread_count'])]
 
     def __init_population(self, population_size):
         input_layer_size = self.problem_params['input_layer_size']
@@ -69,20 +70,34 @@ class GeneticAlgorithm:
 
     def __create_offspring(self, species, offspring_count):
         offspring = list()
-        for _ in range(offspring_count):
+        parents = np.zeros(2*offspring_count, dtype=np.int)
+        for i in range(2*offspring_count):
+            parent1 = np.random.choice(species)
+            parent2 = np.random.choice(species)
+            if (self.population[parent1].fitness > self.population[parent2].fitness).all():
+                parents[i] = parent1
+            elif (self.population[parent2].fitness > self.population[parent1].fitness).all():
+                parents[i] = parent2
+            else:
+                parents[i] = np.random.choice([parent1,parent2])
+        for i in range(0,2*offspring_count,2):
             if np.random.ranf() < self.hparams['prob_mutate']:
-                organism_index = np.random.choice(species)
+                organism_index = parents[i]
                 new_organism = deepcopy(self.population[organism_index])
-                new_organism.mutate()
+                new_organism.mutate(self.hparams)
                 offspring.append(new_organism)
             else:
-                parent_indices = np.random.choice(species, 2)
+                parent_indices = [parents[i], parents[i+1]]
                 parent1 = self.population[parent_indices[0]]
                 parent2 = self.population[parent_indices[1]]
                 offspring.append(parent1.crossover(parent2))
         return offspring
 
     def __speciate_population(self):
+        """
+        Clears the current species and assigns species to all organisms in self.population.
+        """
+        self.all_species = [list() for _ in range(len(self.all_species))]
         for organism_index in range(len(self.population)):
             self.__assign_species(organism_index)
 
@@ -106,8 +121,35 @@ class GeneticAlgorithm:
         offspring_count = self.best_int_split(avg_scores, self.hparams['population_size'])
         return offspring_count
 
+    def __eval_organism(self, population, population_fitnesses, index, progressbar, mutex, free_evaluators):
+        evaluator_index = None
+        mutex.acquire()
+        evaluator_index = free_evaluators.pop()
+        #print(f'Start eval {evaluator_index}')
+        mutex.release()
+
+        population[index].assign_fitness(self.evaluator_list[evaluator_index].evaluate_organism(population[index]))
+        population_fitnesses[index] = population[index].fitness
+
+        mutex.acquire()
+        progressbar.update(progressbar.value + 1)
+        free_evaluators.append(evaluator_index)
+        #print(f'Finish eval {evaluator_index}')
+        mutex.release()
+
     def __evaluate_population(self, population):
         print('Evaluating population...')
+        population_fitnesses = np.zeros((len(population), self.problem_params['evaluator'].get_objective_count()))
+        # bar = progressbar.ProgressBar(max_value=len(population))
+        # mutex = Lock()
+        # pool = ThreadPool(self.hparams['thread_count'])
+        #
+        # free_evaluators = list(range(self.hparams['thread_count']))
+        # pool.starmap(self.__eval_organism,zip(itertools.repeat(population),
+        #             itertools.repeat(population_fitnesses), range(len(population)),itertools.repeat(bar),itertools.repeat(mutex),
+        #                                       itertools.repeat(free_evaluators)))
+        # pool.close()
+        # pool.join()
         population_fitnesses = np.zeros((len(population), self.problem_params['evaluator'].get_objective_count()))
         for i in progressbar.progressbar(range(len(population))):
             population[i].assign_fitness(self.problem_params['evaluator'].evaluate_organism(population[i]))
@@ -159,23 +201,12 @@ class GeneticAlgorithm:
         self.__evaluate_population(new_organisms)                             # Evaluate new organisms
         all_organisms = self.population + new_organisms                       # Join the old population with the new population
         all_scores = np.array([organism.fitness for organism in all_organisms])
-        fronts = nsga_sort(all_scores)                                        # Get fronts from non-domination sort
-        front_organism_index_map: List[List[int]] = [list() for _ in range(max(fronts)+1)]
-        for i in range(len(fronts)):
-            front_organism_index_map[fronts[i]].append(i)
-
-        self.all_species = [[] for _ in range(len(self.all_species))]         # Clear all species
-        self.population = list()                                              # Clear the population
-
-        added_cnt = 0
-        while added_cnt < self.hparams['population_size']:                     # Add the best organisms back into the new population
-            for front in front_organism_index_map:
-                to_add = min(self.hparams['population_size'] - added_cnt, len(front))
-                for i in range(to_add):
-                    organism_to_add: Organism = all_organisms[front[i]]
-                    self.population.append(organism_to_add)
-                    self.all_species[organism_to_add.species_id].append(len(self.population) - 1)
-                    added_cnt += 1
+        organism_index_rank = nsga_sort(all_scores)                           # Get positions of organisms in the sorted array
+        self.population = [None] * self.hparams['population_size']
+        for i in range(len(organism_index_rank)):
+            if organism_index_rank[i] < self.hparams['population_size']:
+                self.population[organism_index_rank[i]] = all_organisms[i]
+                self.population[organism_index_rank[i]].assign_species(None)
 
         self.__speciate_population()                                           # Assign species to newly added organisms
         total_genome_len = 0

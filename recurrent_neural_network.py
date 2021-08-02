@@ -1,6 +1,6 @@
 import numpy as np
-from computation_graph import ComputationGraph
-from activation_functions import identity_function, sigmoid_function
+from utility.computation_graph import ComputationGraph
+from utility.activation_functions import identity_function, sigmoid_function
 
 class NeuralNetwork:
 
@@ -39,6 +39,9 @@ class NeuralNetwork:
     def set_input(self, input_data):
         for i in range(len(input_data)):
             self.computation_graph.set_node_value(self.input_neurons[i], input_data[i])
+
+    def clear_network(self):
+        self.computation_graph.set_node_values(np.zeros_like(self.computation_graph.get_node_values()))
 
     def compute_activations(self):
         """

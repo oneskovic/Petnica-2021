@@ -1,10 +1,9 @@
-from computation_graph import ComputationGraph
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import networkx as nx
 from recurrent_neural_network import NeuralNetwork
-from activation_functions import sigmoid_function
+from utility.activation_functions import sigmoid_function
 
 fig = plt.figure()
 ax1 = fig.add_subplot(1,1,1)

@@ -1,6 +1,6 @@
 import numpy as np
 from recurrent_neural_network import NeuralNetwork
-from activation_functions import all_activation_functions
+from utility.activation_functions import all_activation_functions
 from copy import deepcopy
 
 innovation_id_map = dict()
@@ -53,11 +53,18 @@ class Organism:
         different_genes = different_genes / (1+longest_genome)
         return gene_coeff * different_genes + weight_coeff * weight_difference
 
-    def mutate(self):
-        if np.random.ranf() < 0.5:
+    def mutate(self, hparams):
+        """
+        Insert a new neuron into an existing connection path (with probability given in hparams).
+        Add a new directed connection (with probability given in hparams).
+        Change actiavation function (with probability given in hparams).
+        Assign species to None.
+        """
+        mutation_id = np.random.choice([0,1,2], p=[hparams['prob_mutate_add_neuron'],
+                                        hparams['prob_mutate_add_connection'],
+                                        hparams['prob_mutate_change_activation']])
+        if mutation_id == 0:
             neuron1 = np.random.choice(self.neural_net.get_non_output_neurons())
-            if not self.neural_net.get_connected_neurons(neuron1):
-                print('au buraz')
 
             connected_neurons = self.neural_net.get_connected_neurons(neuron1)
             neuron2_index = np.random.randint(len(connected_neurons))
@@ -71,7 +78,7 @@ class Organism:
                   [self.__get_inovation_id(neuron1, new_neuron),self.__get_inovation_id(new_neuron, neuron2)])
             self.gene_weights = np.append(self.gene_weights, [prev_weight, prev_weight])
 
-        else:
+        elif mutation_id == 1:
             neuron1 = np.random.randint(self.neural_net.neuron_count)
             neuron2 = np.random.randint(self.neural_net.neuron_count)
             weight = np.random.ranf()
@@ -79,6 +86,12 @@ class Organism:
 
             self.gene_ids = np.append(self.gene_ids, self.__get_inovation_id(neuron1, neuron2))
             self.gene_weights = np.append(self.gene_weights, weight)
+
+        else:
+            neuron1 = np.random.randint(self.neural_net.neuron_count)
+            self.neural_net.computation_graph.function_list[neuron1] = np.random.choice(all_activation_functions)
+
+        self.assign_species(None)
 
 
     def crossover(self, other_parent):
@@ -106,5 +119,6 @@ class Organism:
         except:
             print('au buraz')
 
+        child.assign_species(None)
         return child
 
