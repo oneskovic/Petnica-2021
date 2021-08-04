@@ -18,7 +18,9 @@ class Evaluator:
             for t in range(200):
                 if render_env:
                     self.eval_env.render()
+                shared_weight_value = self.hparams['eval_weights'][i_episode]
                 nn: NeuralNetwork = organism.neural_net
+                nn.set_shared_weight(shared_weight_value)
                 nn.clear_network()
                 nn.set_input(observation)
                 output_layer = nn.compute_activations()
@@ -34,7 +36,7 @@ class Evaluator:
                     break
             avg_reward += total_reward / self.hparams['eval_episodes']
         self.eval_env.close()
-        return np.array([avg_reward, -len(organism.gene_ids) + organism.start_gene_count])
+        return np.array([avg_reward, min(-len(organism.gene_ids) + organism.start_gene_count, -1)])
 
     def get_objective_count(self):
         return 2

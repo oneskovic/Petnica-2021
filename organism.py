@@ -15,6 +15,7 @@ class Organism:
         self.start_gene_count = input_layer_size * output_layer_size
         self.species_id = None
         self.fitness = None
+        self.rank = None
         self.is_seed_organism = False
 
         global innovation_id_map, innovation_counter
@@ -46,7 +47,7 @@ class Organism:
 
     def get_distance_from(self, other_organism, gene_coeff, weight_coeff):
         gene_intersection, indices_a, indices_b = np.intersect1d(self.gene_ids, other_organism.gene_ids, return_indices=True)
-        different_genes = len(self.gene_ids) - len(indices_a) + len(other_organism.gene_ids) - len(indices_b)
+        different_genes = max(len(self.gene_ids) - len(indices_a), len(other_organism.gene_ids) - len(indices_b))
         weight_difference = np.abs(self.gene_weights[indices_a] - other_organism.gene_weights[indices_b])
         longest_genome = max(len(self.gene_ids), len(other_organism.gene_ids)) - self.start_gene_count
         weight_difference = np.mean(weight_difference)

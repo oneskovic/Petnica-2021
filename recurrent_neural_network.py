@@ -8,12 +8,19 @@ class NeuralNetwork:
         self.neuron_count = input_size+output_size
         self.input_neurons = np.array(range(0, input_size))
         self.output_neurons = np.array(range(input_size, input_size + output_size))
+        self.bias_neurons = np.array((range(self.neuron_count, 2*self.neuron_count)))
         self.non_output_neurons = np.array(self.input_neurons)
         self.computation_graph = ComputationGraph()
         for _ in range(input_size):
             self.computation_graph.add_node(identity_function)
         for _ in range(output_size):
             self.computation_graph.add_node(sigmoid_function)
+        for _ in range(self.neuron_count):
+            self.computation_graph.add_node(identity_function)
+
+        for i in range(self.neuron_count):
+            self.computation_graph.add_edge(self.neuron_count+i, i, 1)
+
 
     def add_neuron(self, neuron1, neuron2, activation_function):
         """
@@ -28,7 +35,11 @@ class NeuralNetwork:
         new_node = self.computation_graph.add_node(activation_function)
         self.computation_graph.add_edge(neuron1, new_node, old_weight)
         self.computation_graph.add_edge(new_node, neuron2, old_weight)
-        self.computation_graph.remove_edge(neuron1,neuron2)
+        self.computation_graph.remove_edge(neuron1, neuron2)
+
+        bias_node = self.computation_graph.add_node(identity_function)
+        self.computation_graph.add_edge(bias_node, new_node, 1)
+
         self.neuron_count += 1
         self.non_output_neurons = np.append(self.non_output_neurons, new_node)
         return new_node
@@ -39,6 +50,8 @@ class NeuralNetwork:
     def set_input(self, input_data):
         for i in range(len(input_data)):
             self.computation_graph.set_node_value(self.input_neurons[i], input_data[i])
+        for i in range(len(self.bias_neurons)):
+            self.computation_graph.set_node_value(self.bias_neurons[i], 1)
 
     def clear_network(self):
         self.computation_graph.set_node_values(np.zeros_like(self.computation_graph.get_node_values()))
@@ -69,3 +82,8 @@ class NeuralNetwork:
 
     def get_weight(self, neuron1, index):
         return self.computation_graph.get_weight_with_index(neuron1, index)
+
+    def set_shared_weight(self, weight):
+        for i in range(self.neuron_count):
+            self.computation_graph.weights[i] = [weight] * len(self.computation_graph.weights[i])
+            self.computation_graph.transpose_weights[i] = [weight] * len(self.computation_graph.transpose_weights[i])

@@ -60,9 +60,9 @@ def getFronts(objVals):
   values1 = objVals[:,0]
   values2 = objVals[:,1]
   
-  S=[[] for i in range(0,len(values1))]
+  S=[[] for i in range(0,len(values1))]                                         # Set of values that i dominates
   front = [[]]
-  n=[0 for i in range(0,len(values1))]
+  n=[0 for i in range(0,len(values1))]                                          # Number of values that dominate i
   rank = [0 for i in range(0, len(values1))]
   # Get domination relations
   for p in range(0,len(values1)):
@@ -71,12 +71,12 @@ def getFronts(objVals):
       for q in range(0, len(values1)):
           if (values1[p] > values1[q] and values2[p] > values2[q]) \
           or (values1[p] >= values1[q] and values2[p] > values2[q]) \
-          or (values1[p] > values1[q] and values2[p] >= values2[q]):
+          or (values1[p] > values1[q] and values2[p] >= values2[q]):            # P dominates Q
               if q not in S[p]:
                   S[p].append(q)
           elif (values1[q] > values1[p] and values2[q] > values2[p]) \
           or (values1[q] >= values1[p] and values2[q] > values2[p]) \
-          or (values1[q] > values1[p] and values2[q] >= values2[p]):
+          or (values1[q] > values1[p] and values2[q] >= values2[p]):            # Q dominates P
               n[p] = n[p] + 1
       if n[p]==0:
           rank[p] = 0
