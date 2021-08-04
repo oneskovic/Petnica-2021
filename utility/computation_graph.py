@@ -1,60 +1,45 @@
 import numpy as np
-import queue
-from copy import deepcopy
+from numpy import ndarray
 
 class ComputationGraph:
 
     def __init__(self):
-        self.adjacency_list = list()
-        self.transpose_adj_list = list()
+        self.transpose_adjacency_matrix = None
         self.function_list = list()
-        self.weights = list()
-        self.transpose_weights = list()
-        self.node_values = np.zeros(0)
+        self.node_values = None
 
     def add_node(self, function):
-        self.adjacency_list.append(list())
-        self.transpose_adj_list.append(list())
         self.function_list.append(function)
-        self.node_values = np.append(self.node_values, 0)
-        self.weights.append(list())
-        self.transpose_weights.append(list())
+        if self.transpose_adjacency_matrix is None:
+            self.node_values = np.zeros(1)
+            self.transpose_adjacency_matrix = np.zeros((1, 1), dtype=bool)
+        else:
+            self.node_values = np.append(self.node_values, 0)
+            self.transpose_adjacency_matrix = np.vstack((self.transpose_adjacency_matrix, np.zeros(len(self.node_values) - 1, dtype=bool)))
+            self.transpose_adjacency_matrix = np.hstack((self.transpose_adjacency_matrix, np.zeros((len(self.node_values),1), dtype=bool)))
+
         return len(self.node_values)-1
 
     def add_edge(self, node1, node2, weight):
-        self.adjacency_list[node1].append(node2)
-        self.transpose_adj_list[node2].append(node1)
-        self.weights[node1].append(weight)
-        self.transpose_weights[node2].append(weight)
+        self.transpose_adjacency_matrix[node2][node1] = 1
 
     def remove_edge(self, node1, node2):
-        index_as_neighbor = self.adjacency_list[node1].index(node2)
-        del self.adjacency_list[node1][index_as_neighbor]
-        del self.weights[node1][index_as_neighbor]
-
-        index_as_neighbor = self.transpose_adj_list[node2].index(node1)
-        del self.transpose_adj_list[node2][index_as_neighbor]
-        del self.transpose_weights[node2][index_as_neighbor]
+        self.transpose_adjacency_matrix[node2][node1] = 0
 
     def get_weight_between_nodes(self, node1, node2):
-        index_as_neighbor = self.adjacency_list[node1].index(node2)
-        return self.weights[node1][index_as_neighbor]
+        return 1
 
     def get_weight_with_index(self, node1, index):
-        return self.weights[node1][index]
+        return 1
 
     def set_node_value(self, node, value):
         self.node_values[node] = value
 
-    def evaluate(self):
-        new_values = deepcopy(self.node_values)     # Make an array for new node values
-        for node in range(len(new_values)):
-            args = np.zeros(len(self.transpose_adj_list[node]))
-            for i in range(len(args)):
-                args[i] = self.node_values[self.transpose_adj_list[node][i]]*self.transpose_weights[node][i]
-            if len(args) > 0:
-                new_values[node] = self.function_list[node](args)
-        self.node_values = new_values               # Replace old node values with new node values
+    def evaluate(self, weight):
+        self.node_values = np.matmul(self.transpose_adjacency_matrix,self.node_values)
+        self.node_values = self.node_values * weight
+        for i in range(len(self.node_values)):
+            self.node_values[i] = self.function_list[i](self.node_values[i])
 
     def get_node_value(self, node):
         return self.node_values[node]
@@ -62,5 +47,5 @@ class ComputationGraph:
     def get_node_values(self):
         return self.node_values
 
-    def set_node_values(self, new_node_values):
-        self.node_values = deepcopy(new_node_values)
+    def set_node_values(self, new_node_values: np.ndarray):
+        self.node_values = np.copy(new_node_values)

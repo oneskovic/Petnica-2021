@@ -11,6 +11,7 @@ class NeuralNetwork:
         self.bias_neurons = np.array((range(self.neuron_count, 2*self.neuron_count)))
         self.non_output_neurons = np.array(self.input_neurons)
         self.computation_graph = ComputationGraph()
+        self.shared_weight = 0.0
         for _ in range(input_size):
             self.computation_graph.add_node(identity_function)
         for _ in range(output_size):
@@ -62,7 +63,7 @@ class NeuralNetwork:
         Returns:
         The output layer of the network.
         """
-        self.computation_graph.evaluate()
+        self.computation_graph.evaluate(self.shared_weight)
         output = np.zeros_like(self.output_neurons, dtype=np.float32)
         for i in range(len(output)):
             output[i] = self.computation_graph.get_node_value(self.output_neurons[i])
@@ -78,12 +79,13 @@ class NeuralNetwork:
         return self.non_output_neurons
 
     def get_connected_neurons(self, neuron):
-        return self.computation_graph.adjacency_list[neuron]
+        return np.nonzero(self.computation_graph.transpose_adjacency_matrix[neuron])
 
     def get_weight(self, neuron1, index):
         return self.computation_graph.get_weight_with_index(neuron1, index)
 
     def set_shared_weight(self, weight):
-        for i in range(self.neuron_count):
-            self.computation_graph.weights[i] = [weight] * len(self.computation_graph.weights[i])
-            self.computation_graph.transpose_weights[i] = [weight] * len(self.computation_graph.transpose_weights[i])
+        self.shared_weight = weight
+        # for i in range(self.neuron_count):
+        #     self.computation_graph.weights[i] = [weight] * len(self.computation_graph.weights[i])
+        #     self.computation_graph.transpose_weights[i] = [weight] * len(self.computation_graph.transpose_weights[i])

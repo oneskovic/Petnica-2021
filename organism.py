@@ -67,10 +67,11 @@ class Organism:
         if mutation_id == 0:
             neuron1 = np.random.choice(self.neural_net.get_non_output_neurons())
 
-            connected_neurons = self.neural_net.get_connected_neurons(neuron1)
-            neuron2_index = np.random.randint(len(connected_neurons))
-            neuron2 = connected_neurons[neuron2_index]
-            prev_weight = self.neural_net.get_weight(neuron1,neuron2_index)
+            connected_neurons = self.neural_net.get_connected_neurons(neuron1)[0]
+            if len(connected_neurons) is 0:
+                print('au buraz')
+            neuron2 = np.random.choice(connected_neurons)
+            prev_weight = self.neural_net.get_weight(neuron1,neuron2)
 
             function = np.random.choice(all_activation_functions)
             new_neuron = self.neural_net.add_neuron(neuron1, neuron2, function)

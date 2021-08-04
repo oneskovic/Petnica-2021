@@ -9,8 +9,8 @@ class Evaluator:
 
     def evaluate_organism(self, organism, render_env = False):
         avg_reward = 0.0
-        all_episode_actions = [list() for _ in range(self.hparams['eval_episodes'])]
-        all_episode_obs = [list() for _ in range(self.hparams['eval_episodes'])]
+        # all_episode_actions = [list() for _ in range(self.hparams['eval_episodes'])]
+        # all_episode_obs = [list() for _ in range(self.hparams['eval_episodes'])]
 
         for i_episode in range(self.hparams['eval_episodes']):
             observation = self.eval_env.reset()
@@ -26,8 +26,8 @@ class Evaluator:
                 output_layer = nn.compute_activations()
                 action = np.argmax(output_layer)
 
-                all_episode_actions[i_episode].append(action)
-                all_episode_obs[i_episode].append(observation)
+                # all_episode_actions[i_episode].append(action)
+                # all_episode_obs[i_episode].append(observation)
 
                 observation, reward, done, info = self.eval_env.step(action)
                 total_reward += reward
@@ -36,7 +36,7 @@ class Evaluator:
                     break
             avg_reward += total_reward / self.hparams['eval_episodes']
         self.eval_env.close()
-        return np.array([avg_reward, min(-len(organism.gene_ids) + organism.start_gene_count, -1)])
+        return np.array([avg_reward, min(-(len(organism.gene_ids) - organism.start_gene_count), -1)])
 
     def get_objective_count(self):
         return 2

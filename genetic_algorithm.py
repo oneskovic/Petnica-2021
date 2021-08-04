@@ -53,7 +53,7 @@ class GeneticAlgorithm:
                 if dist <= self.hparams['species_threshold']:
                     species_list[species_index].append(organism_index)
                     population[organism_index].assign_species(species_index)
-                    if population[organism_index].rank > species_max_score[species_index]:
+                    if population[organism_index].rank < species_max_score[species_index]:
                         species_max_score[species_index] = population[organism_index].rank
                         species_last_improvement[species_index] = self.generation_number
                     was_assigned_species = True
@@ -104,8 +104,8 @@ class GeneticAlgorithm:
         parent1_torunament = np.random.choice(species, size=(offspring_count, self.hparams['tournament_size']))
         parent2_tournament = np.random.choice(species, size=(offspring_count, self.hparams['tournament_size']))
         # Organisms are already sorted so comparing by index is enough
-        parents1 = parent1_torunament.max(axis=1)
-        parents2 = parent2_tournament.max(axis=1)
+        parents1 = parent1_torunament.min(axis=1)
+        parents2 = parent2_tournament.min(axis=1)
         for i in range(offspring_count):
             if np.random.ranf() < self.hparams['prob_mutate']:
                 organism_index = parents1[i]
@@ -146,15 +146,13 @@ class GeneticAlgorithm:
             organism.assign_species(None)
         left = 1.0
         right = 0.0
-        prev_max = 0
 
         while left - right > self.hparams['species_threshold_precision']:
             mid = (left+right)/2.0
             self.hparams['species_threshold'] = mid
             total_nonempty_species = self.__try_speciate()
-            if prev_max <= total_nonempty_species <= self.hparams['species_count']:
+            if total_nonempty_species <= self.hparams['species_count']:
                 left = mid
-                prev_max = total_nonempty_species
             else:
                 right = mid
 
@@ -167,7 +165,7 @@ class GeneticAlgorithm:
     def __assign_offspring(self, all_species):
         """
         Assigns a number of offspring to each species based on fitnesses of organisms inside the species.
-        Assumes the organisms have already been evaluated (ie. that the organism.fitness property was calculated)
+        Assumes the organisms have already been evaluated (ie. that self.population is sorted)
         Args:
             all_species: list(list(int)) - indices of organisms in each species
         Returns:
@@ -177,9 +175,17 @@ class GeneticAlgorithm:
         for species_index in range(len(all_species)):
             total_score = 0.0
             if len(all_species[species_index]) > 0:
-                for organism_index in range(len(all_species[species_index])):
-                    total_score += np.sum(self.population[organism_index].fitness)
+                for organism_index in all_species[species_index]:
+                    total_score += self.population[organism_index].rank
                 avg_scores[species_index] = total_score / len(all_species[species_index])
+
+        if self.hparams['offspring_weighing'] is 'linear':
+            max_val = avg_scores.max()
+            avg_scores = avg_scores-max_val
+            avg_scores = np.abs(avg_scores)
+        else:
+            avg_scores = 1.0/avg_scores
+
 
         offspring_count = self.best_int_split(avg_scores, self.hparams['population_size'])
         offspring_count_start = deepcopy(offspring_count)
@@ -189,14 +195,14 @@ class GeneticAlgorithm:
         for i in range(len(self.all_species)):
             time_since_improvement = self.generation_number - self.species_last_improvement[i]
             if time_since_improvement > self.hparams['stagnation_start']:
-                taken_children = min(offspring_count[i] * 0.08*time_since_improvement**2, offspring_count[i])
+                taken_children = min(int(offspring_count[i] * 0.008*time_since_improvement**2), offspring_count[i])
                 children_to_distribute += taken_children
                 offspring_count[i] -= taken_children
             else:
                 nonstagnating_species.append(i)
         if len(nonstagnating_species) > 0 and children_to_distribute > 0:
             fraction = 1.0/len(nonstagnating_species)
-            split = self.best_int_split([fraction]*len(nonstagnating_species),children_to_distribute)
+            split = self.best_int_split([fraction]*len(nonstagnating_species), children_to_distribute)
             for i in range(len(split)):
                 spec_index = nonstagnating_species[i]
                 offspring_count[spec_index] += split[i]
@@ -223,7 +229,7 @@ class GeneticAlgorithm:
 
     def __evaluate_population(self, population):
         print('Evaluating population...')
-        population_fitnesses = np.zeros((len(population), self.problem_params['evaluator'].get_objective_count()))
+        # population_fitnesses = np.zeros((len(population), self.problem_params['evaluator'].get_objective_count()))
         # bar = progressbar.ProgressBar(max_value=len(population))
         # mutex = Lock()
         # pool = ThreadPool(self.hparams['thread_count'])
@@ -245,7 +251,7 @@ class GeneticAlgorithm:
     def get_stats(self):
         nonempty_species = [species for species in self.all_species if len(species) > 0]
         species_sizes = np.array([len(species) for species in nonempty_species])
-        species_scores = [list()] * len(nonempty_species)
+        species_scores = [list() for _ in range(len(nonempty_species))]
         for nonempty_index in range(len(nonempty_species)):
             for organism_index in nonempty_species[nonempty_index]:
                 species_scores[nonempty_index].append(self.population[organism_index].fitness)
@@ -287,13 +293,11 @@ class GeneticAlgorithm:
         offspring_per_species = self.__assign_offspring(self.all_species)     # Assign offspring count to each species
 
         new_organisms: List[Organism] = list()
-        new_organisms_species_index: List[int] = list()
         for species_index in range(len(self.all_species)):                    # Crossover and mutate organisms in each species
             if len(self.all_species[species_index]) > 0:
                 species_offspring = self.__create_offspring(self.all_species[species_index], offspring_per_species[species_index])
                 for organism in species_offspring:
                     new_organisms.append(organism)
-                    new_organisms_species_index.append(species_index)
 
         self.__evaluate_population(new_organisms)                             # Evaluate new organisms
         all_organisms = self.population + new_organisms                       # Join the old population with the new population

@@ -21,12 +21,13 @@ def train():
         'gene_coeff': 1.0,                      # Weigh the importance of gene differences
         'weight_coeff': 0.0,                    # Unused
         'species_threshold_precision': 0.05,    # Precision when searching for species threshold
-        'prob_multiobjective': 1.0,
+        'prob_multiobjective': 0.7,
         'prob_mutate': 0.8,                     # Probability of mutation
         'prob_mutate_add_neuron': 0.25,         # If a mutation occurs the probability of adding a new neuron
         'prob_mutate_add_connection': 0.25,     # If a mutation occurs the probability of adding a new connection
         'prob_mutate_change_activation': 0.5,   # If a mutation occurs the probability of changing a neuron activation
         'dieoff_fraction': 0.0,                 # Unused
+        'offspring_weighing': 'linear',         # Options: linear, exponential (1/x)
         'tournament_size': 8,                   # The size of tournament used in parent selection
         'species_count': 5,                     # The upper bound on species count
         'eval_episodes': 6,
