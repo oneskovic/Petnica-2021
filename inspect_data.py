@@ -7,7 +7,7 @@ import time
 
 plt.ion()
 while True:
-    list_of_files = sorted(glob.glob('data/run 2021_08_04 22_04_49/*'),key=os.path.getctime)
+    list_of_files = sorted(glob.glob('data/run 2021_08_05 15_00_24/*'),key=os.path.getctime)
     latest_file_name = list_of_files[-1]
     data_file = open(latest_file_name, 'rb')
     logger = pickle.load(data_file)

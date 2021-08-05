@@ -7,6 +7,8 @@ from copy import deepcopy
 import progressbar
 from utility.logger import Logger
 import operator
+import math
+from mpi4py import MPI
 
 
 class GeneticAlgorithm:
@@ -32,17 +34,48 @@ class GeneticAlgorithm:
         input_layer_size = self.problem_params['input_layer_size']
         output_layer_size = self.problem_params['output_layer_size']
         self.population = [Organism(input_layer_size, output_layer_size) for _ in range(population_size)]
-        for i in range(population_size):
-            for _ in range(20):
-                self.population[i].mutate(self.hparams)
+        print('Generating starting population...')
+        self.__create_good_starting_pop()
 
-        self.__evaluate_population(self.population)
+        self.__evaluate_population_parallel(self.population)
 
         all_scores = np.array([organism.fitness for organism in self.population])
-        organism_index_rank = nsga_sort(all_scores)
-        for i in range(len(organism_index_rank)):
-            self.population[i].rank = organism_index_rank[i]
+
+        if np.random.ranf() < self.hparams['prob_multiobjective']:
+            organism_index_rank = nsga_sort(all_scores)  # Get positions of organisms in the sorted array
+            for i in range(len(organism_index_rank)):
+                self.population[i].rank = organism_index_rank[i]
+        else:
+            argsort = np.argsort(-all_scores[:, 0])
+            for i in range(len(argsort)):
+                self.population[argsort[i]].rank = i
+
+        self.population.sort(key=operator.attrgetter('rank'))
         self.__speciate_population()
+
+    def __generate_random_pop(self, count):
+        input_layer_size = self.problem_params['input_layer_size']
+        output_layer_size = self.problem_params['output_layer_size']
+        population = [Organism(input_layer_size,output_layer_size) for _ in range(count)]
+        for i in range(len(population)):
+            for _ in range(20):
+                population[i].mutate(self.hparams)
+        return population
+
+    def __create_good_starting_pop(self):
+        good_generated = 0
+        bar = progressbar.ProgressBar(max_value=len(self.population))
+        while good_generated < len(self.population):
+            random_pop = self.__generate_random_pop(max(len(self.population)-good_generated,50))
+            scores = self.__evaluate_population_parallel(random_pop)
+            for i in range(len(random_pop)):
+                if scores[i][0] > -190:
+                    self.population[good_generated] = random_pop[i]
+                    good_generated += 1
+                    if good_generated >= len(self.population):
+                        break
+                    bar.update(good_generated)
+
 
     def __assign_species(self, organism_index, population, species_list, seed_organism_list, species_last_improvement, species_max_score):
         if population[organism_index].species_id is None:
@@ -110,7 +143,8 @@ class GeneticAlgorithm:
             if np.random.ranf() < self.hparams['prob_mutate']:
                 organism_index = parents1[i]
                 new_organism = deepcopy(self.population[organism_index])
-                new_organism.mutate(self.hparams)
+                for _ in range(int(0.1*len(self.population[organism_index].gene_ids))):
+                    new_organism.mutate(self.hparams)
                 offspring.append(new_organism)
             else:
                 parent_indices = [parents1[i], parents2[i]]
@@ -179,10 +213,10 @@ class GeneticAlgorithm:
                     total_score += self.population[organism_index].rank
                 avg_scores[species_index] = total_score / len(all_species[species_index])
 
-        if self.hparams['offspring_weighing'] is 'linear':
+        if self.hparams['offspring_weighing'] == 'linear':
             max_val = avg_scores.max()
             avg_scores = avg_scores-max_val
-            avg_scores = np.abs(avg_scores)
+            avg_scores = 1+np.abs(avg_scores)
         else:
             avg_scores = 1.0/avg_scores
 
@@ -193,6 +227,11 @@ class GeneticAlgorithm:
         nonstagnating_species = list()
         children_to_distribute = 0
         for i in range(len(self.all_species)):
+            if len(self.all_species[i]) == 0:
+                children_to_distribute += offspring_count[i]
+                offspring_count[i] = 0
+                continue
+
             time_since_improvement = self.generation_number - self.species_last_improvement[i]
             if time_since_improvement > self.hparams['stagnation_start']:
                 taken_children = min(int(offspring_count[i] * 0.008*time_since_improvement**2), offspring_count[i])
@@ -227,19 +266,42 @@ class GeneticAlgorithm:
         #print(f'Finish eval {evaluator_index}')
         mutex.release()
 
-    def __evaluate_population(self, population):
+    def __evaluate_population_parallel(self, population):
         print('Evaluating population...')
-        # population_fitnesses = np.zeros((len(population), self.problem_params['evaluator'].get_objective_count()))
-        # bar = progressbar.ProgressBar(max_value=len(population))
-        # mutex = Lock()
-        # pool = ThreadPool(self.hparams['thread_count'])
-        #
-        # free_evaluators = list(range(self.hparams['thread_count']))
-        # pool.starmap(self.__eval_organism,zip(itertools.repeat(population),
-        #             itertools.repeat(population_fitnesses), range(len(population)),itertools.repeat(bar),itertools.repeat(mutex),
-        #                                       itertools.repeat(free_evaluators)))
-        # pool.close()
-        # pool.join()
+
+        fraction = 1.0/ (self.hparams['thread_count']-1)
+        # Split population into equal parts
+
+        population_split = [list() for _ in range(self.hparams['thread_count']-1)]
+        population_counts_split = self.best_int_split([fraction]*len(population_split),len(population))
+        j = 0
+        for i in range(len(population_split)):
+            population_split[i] = population[j:j+population_counts_split[i]]
+            j += population_counts_split[i]
+        mpi_comm = MPI.COMM_WORLD
+        mpi_size = mpi_comm.Get_size()
+        mpi_rank = mpi_comm.Get_rank()
+        for i in range(len(population_split)):
+            population_part = population_split[i]
+            mpi_comm.send(population_part, dest=i+1, tag=1)
+            # print(f'{mpi_rank} Sent population part of size: {len(population_part)}')
+
+        scores = np.zeros((1, self.problem_params['evaluator'].get_objective_count()))
+        for i in range(len(population_split)):
+            recv_score = mpi_comm.recv(source=i+1, tag=1)
+            # print(f'{mpi_rank} Recieved scores of size: {len(recv_score)}')
+            # print(recv_score)
+            scores = np.vstack((scores, recv_score))
+
+        # print('Scores:')
+        # print(scores)
+        for i in range(1, len(scores)):
+            population[i-1].assign_fitness(scores[i])
+        print(' ')
+        return scores
+
+    def __evaluate_population_serial(self, population):
+        print('Evaluating population...')
         population_fitnesses = np.zeros((len(population), self.problem_params['evaluator'].get_objective_count()))
         for i in progressbar.progressbar(range(len(population))):
             population[i].assign_fitness(self.problem_params['evaluator'].evaluate_organism(population[i]))
@@ -289,7 +351,12 @@ class GeneticAlgorithm:
 
     def step_generation(self):
         self.get_stats()
-        self.__evaluate_population(self.population)
+        #self.__evaluate_population(self.population)
+
+        debug_arr = np.array([o.fitness[0] for o in self.population])
+        if not np.all(np.diff(np.abs(debug_arr)) >= 0):
+            print('au buraz')
+
         offspring_per_species = self.__assign_offspring(self.all_species)     # Assign offspring count to each species
 
         new_organisms: List[Organism] = list()
@@ -299,22 +366,30 @@ class GeneticAlgorithm:
                 for organism in species_offspring:
                     new_organisms.append(organism)
 
-        self.__evaluate_population(new_organisms)                             # Evaluate new organisms
+        self.__evaluate_population_parallel(new_organisms)                             # Evaluate new organisms
         all_organisms = self.population + new_organisms                       # Join the old population with the new population
         all_scores = np.array([organism.fitness for organism in all_organisms])
 
         if np.random.ranf() < self.hparams['prob_multiobjective']:
             organism_index_rank = nsga_sort(all_scores)                       # Get positions of organisms in the sorted array
+            for i in range(len(organism_index_rank)):
+                all_organisms[i].rank = organism_index_rank[i]
         else:
-            organism_index_rank = np.argsort(-all_scores[:, 0])
-        for i in range(len(organism_index_rank)):
-            all_organisms[i].rank = organism_index_rank[i]
+            argsort = np.argsort(-all_scores[:, 0])
+            organism_index_rank = np.zeros(len(argsort), dtype=int)
+            for i in range(len(argsort)):
+                all_organisms[argsort[i]].rank = i
+                organism_index_rank[argsort[i]] = i
 
         self.population = [None] * self.hparams['population_size']
         for i in range(len(organism_index_rank)):                            # Sort organisms in O(n)
             if organism_index_rank[i] < self.hparams['population_size']:
                 self.population[organism_index_rank[i]] = all_organisms[i]
                 self.population[organism_index_rank[i]].assign_species(None)
+
+        debug_arr = np.array([o.fitness[0] for o in self.population])
+        if not np.all(np.diff(np.abs(debug_arr)) >= 0):
+            print('au buraz')
 
         self.__speciate_population()                                         # Assign species to newly added organisms
         self.__remove_empty_species()

@@ -81,16 +81,15 @@ class Organism:
             self.gene_weights = np.append(self.gene_weights, [prev_weight, prev_weight])
 
         elif mutation_id == 1:
-            neuron1 = np.random.randint(self.neural_net.neuron_count)
-            neuron2 = np.random.randint(self.neural_net.neuron_count)
-            weight = np.random.ranf()
-            self.neural_net.connect_neurons(neuron1, neuron2, weight)
+            neuron1 = np.random.choice(self.neural_net.non_output_neurons)
+            neuron2 = np.random.choice(self.neural_net.non_output_neurons)
+            self.neural_net.connect_neurons(neuron1, neuron2, 1)
 
             self.gene_ids = np.append(self.gene_ids, self.__get_inovation_id(neuron1, neuron2))
-            self.gene_weights = np.append(self.gene_weights, weight)
+            self.gene_weights = np.append(self.gene_weights, 1)
 
         else:
-            neuron1 = np.random.randint(self.neural_net.neuron_count)
+            neuron1 = np.random.choice(self.neural_net.non_output_neurons)
             self.neural_net.computation_graph.function_list[neuron1] = np.random.choice(all_activation_functions)
 
         self.assign_species(None)

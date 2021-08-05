@@ -8,19 +8,24 @@ class NeuralNetwork:
         self.neuron_count = input_size+output_size
         self.input_neurons = np.array(range(0, input_size))
         self.output_neurons = np.array(range(input_size, input_size + output_size))
-        self.bias_neurons = np.array((range(self.neuron_count, 2*self.neuron_count)))
+        self.bias_neurons = np.array(range(self.neuron_count, 2*self.neuron_count))
         self.non_output_neurons = np.array(self.input_neurons)
         self.computation_graph = ComputationGraph()
         self.shared_weight = 0.0
-        for _ in range(input_size):
+        for _ in range(input_size):                                             # Add input neurons
             self.computation_graph.add_node(identity_function)
-        for _ in range(output_size):
+        for _ in range(output_size):                                            # Add output neurons
             self.computation_graph.add_node(sigmoid_function)
         for _ in range(self.neuron_count):
             self.computation_graph.add_node(identity_function)
 
-        for i in range(self.neuron_count):
-            self.computation_graph.add_edge(self.neuron_count+i, i, 1)
+        for input_neuron in self.input_neurons:
+            for output_neuron in self.output_neurons:
+                self.computation_graph.add_edge(input_neuron, output_neuron, 1)
+        all_neurons = np.append(self.input_neurons, self.output_neurons)
+        for i in range(len(all_neurons)):
+            self.computation_graph.add_edge(self.bias_neurons[i], all_neurons[i], 1)
+
 
 
     def add_neuron(self, neuron1, neuron2, activation_function):
@@ -43,6 +48,7 @@ class NeuralNetwork:
 
         self.neuron_count += 1
         self.non_output_neurons = np.append(self.non_output_neurons, new_node)
+        self.bias_neurons = np.append(self.bias_neurons, bias_node)
         return new_node
 
     def connect_neurons(self, neuron1, neuron2, weight):
@@ -79,7 +85,7 @@ class NeuralNetwork:
         return self.non_output_neurons
 
     def get_connected_neurons(self, neuron):
-        return np.nonzero(self.computation_graph.transpose_adjacency_matrix[neuron])
+        return np.nonzero(self.computation_graph.transpose_adjacency_matrix[:,neuron])
 
     def get_weight(self, neuron1, index):
         return self.computation_graph.get_weight_with_index(neuron1, index)
