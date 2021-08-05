@@ -99,12 +99,12 @@ mpi_size = mpi_comm.Get_size()
 mpi_rank = mpi_comm.Get_rank()
 
 hparams = {
-    'population_size': 120,
+    'population_size': 200,
     'gene_coeff': 1.0,                      # Weigh the importance of gene differences
     'weight_coeff': 0.0,                    # Unused
     'species_threshold_precision': 0.05,    # Precision when searching for species threshold
-    'prob_multiobjective': 0,
-    'prob_mutate': 0.8,                     # Probability of mutation
+    'prob_multiobjective': 0.5,
+    'prob_mutate': 0.5,                     # Probability of mutation
     'prob_mutate_add_neuron': 0.25,         # If a mutation occurs the probability of adding a new neuron
     'prob_mutate_add_connection': 0.25,     # If a mutation occurs the probability of adding a new connection
     'prob_mutate_change_activation': 0.5,   # If a mutation occurs the probability of changing a neuron activation
@@ -118,16 +118,16 @@ hparams = {
     'stagnation_start': 4                   # Number of generations after which a species will be penalized for stagnation
 }
 
-# train(hparams)
-if mpi_rank == 0:
-    train(hparams)
-else:
-    while True:
-        # print(mpi_rank)
-        population_to_eval = mpi_comm.recv(source=0, tag=1)
-        # print(f'{mpi_rank} Recieved population to eval of size {len(population_to_eval)}')
-        evaluator = Evaluator(environment, hparams)
-        scores = np.zeros((len(population_to_eval),evaluator.get_objective_count()))
-        for i in range(len(population_to_eval)):
-            scores[i] = evaluator.evaluate_organism(population_to_eval[i])
-        mpi_comm.send(scores, dest=0, tag=1)
+train(hparams)
+# if mpi_rank == 0:
+#     train(hparams)
+# else:
+#     while True:
+#         # print(mpi_rank)
+#         population_to_eval = mpi_comm.recv(source=0, tag=1)
+#         # print(f'{mpi_rank} Recieved population to eval of size {len(population_to_eval)}')
+#         evaluator = Evaluator(environment, hparams)
+#         scores = np.zeros((len(population_to_eval),evaluator.get_objective_count()))
+#         for i in range(len(population_to_eval)):
+#             scores[i] = evaluator.evaluate_organism(population_to_eval[i])
+#         mpi_comm.send(scores, dest=0, tag=1)

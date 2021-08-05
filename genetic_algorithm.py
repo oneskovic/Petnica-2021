@@ -37,7 +37,7 @@ class GeneticAlgorithm:
         print('Generating starting population...')
         self.__create_good_starting_pop()
 
-        self.__evaluate_population_parallel(self.population)
+        self.__evaluate_population_serial(self.population)
 
         all_scores = np.array([organism.fitness for organism in self.population])
 
@@ -67,7 +67,7 @@ class GeneticAlgorithm:
         bar = progressbar.ProgressBar(max_value=len(self.population))
         while good_generated < len(self.population):
             random_pop = self.__generate_random_pop(max(len(self.population)-good_generated,50))
-            scores = self.__evaluate_population_parallel(random_pop)
+            scores = self.__evaluate_population_serial(random_pop)
             for i in range(len(random_pop)):
                 if scores[i][0] > -190:
                     self.population[good_generated] = random_pop[i]
@@ -81,8 +81,12 @@ class GeneticAlgorithm:
         if population[organism_index].species_id is None:
             was_assigned_species = False
             for species_index in range(len(species_list)):
-                dist = population[organism_index].get_distance_from(population[seed_organism_list[species_index]],
+                dist = 0.0
+                try:
+                    dist = population[organism_index].get_distance_from(population[seed_organism_list[species_index]],
                                                                          self.hparams['gene_coeff'], self.hparams['weight_coeff'])
+                except:
+                    pass
                 if dist <= self.hparams['species_threshold']:
                     species_list[species_index].append(organism_index)
                     population[organism_index].assign_species(species_index)
@@ -359,37 +363,53 @@ class GeneticAlgorithm:
 
         offspring_per_species = self.__assign_offspring(self.all_species)     # Assign offspring count to each species
 
+        organisms_in_species = [list() for _ in range(len(self.all_species))]
+        for i in range(len(self.all_species)):
+            organisms_in_species[i] = [self.population[self.all_species[i][j]] for j in range(len(self.all_species[i]))]
+
         new_organisms: List[Organism] = list()
         for species_index in range(len(self.all_species)):                    # Crossover and mutate organisms in each species
             if len(self.all_species[species_index]) > 0:
                 species_offspring = self.__create_offspring(self.all_species[species_index], offspring_per_species[species_index])
                 for organism in species_offspring:
                     new_organisms.append(organism)
+                    organisms_in_species[species_index].append(organism)
 
-        self.__evaluate_population_parallel(new_organisms)                             # Evaluate new organisms
-        all_organisms = self.population + new_organisms                       # Join the old population with the new population
-        all_scores = np.array([organism.fitness for organism in all_organisms])
+        self.__evaluate_population_serial(new_organisms)                             # Evaluate new organisms
+        self.population = self.population + new_organisms                       # Join the old population with the new population
+        all_scores = np.array([organism.fitness for organism in self.population])
 
         if np.random.ranf() < self.hparams['prob_multiobjective']:
             organism_index_rank = nsga_sort(all_scores)                       # Get positions of organisms in the sorted array
             for i in range(len(organism_index_rank)):
-                all_organisms[i].rank = organism_index_rank[i]
+                self.population[i].rank = organism_index_rank[i]
         else:
             argsort = np.argsort(-all_scores[:, 0])
             organism_index_rank = np.zeros(len(argsort), dtype=int)
             for i in range(len(argsort)):
-                all_organisms[argsort[i]].rank = i
+                self.population[argsort[i]].rank = i
                 organism_index_rank[argsort[i]] = i
 
-        self.population = [None] * self.hparams['population_size']
-        for i in range(len(organism_index_rank)):                            # Sort organisms in O(n)
-            if organism_index_rank[i] < self.hparams['population_size']:
-                self.population[organism_index_rank[i]] = all_organisms[i]
-                self.population[organism_index_rank[i]].assign_species(None)
+        # self.population = [None] * self.hparams['population_size']
+        # for i in range(len(organism_index_rank)):                            # Sort organisms in O(n)
+        #     if organism_index_rank[i] < self.hparams['population_size']:
+        #         self.population[organism_index_rank[i]] = all_organisms[i]
+        #         self.population[organism_index_rank[i]].assign_species(None)
 
-        debug_arr = np.array([o.fitness[0] for o in self.population])
-        if not np.all(np.diff(np.abs(debug_arr)) >= 0):
-            print('au buraz')
+        # debug_arr = np.array([o.fitness[0] for o in self.population])
+        # if not np.all(np.diff(np.abs(debug_arr)) >= 0):
+        #     print('au buraz')
+
+
+
+
+        for i in range(len(self.all_species)):
+            organisms_in_species[i].sort(key=operator.attrgetter('rank'))
+        self.population = list()
+        for i in range(len(self.all_species)):
+            self.population = self.population + organisms_in_species[i][:offspring_per_species[i]]
+
+        self.population.sort(key=operator.attrgetter('rank'))
 
         self.__speciate_population()                                         # Assign species to newly added organisms
         self.__remove_empty_species()
