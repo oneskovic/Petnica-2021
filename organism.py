@@ -10,7 +10,7 @@ innovation_counter = 0
 class Organism:
     def __init__(self, input_layer_size, output_layer_size):
         self.neural_net = NeuralNetwork(input_layer_size, output_layer_size)
-        self.gene_ids = np.array(np.arange(input_layer_size * output_layer_size))
+        self.gene_ids = np.array(0)
         self.gene_weights = np.random.rand(input_layer_size*output_layer_size)
         self.start_gene_count = input_layer_size * output_layer_size
         self.species_id = None
@@ -19,22 +19,22 @@ class Organism:
         self.is_seed_organism = False
 
         global innovation_id_map, innovation_counter
-        if innovation_counter == 0:
-            for input_neuron in self.neural_net.get_input_neuron_indices():
-                for output_neuron in self.neural_net.get_output_neuron_indices():
-                    innovation_id_map[(input_neuron, output_neuron)] = innovation_counter
-                    innovation_counter += 1
+        # if innovation_counter == 0:
+        #     for input_neuron in self.neural_net.get_input_neuron_indices():
+        #         for output_neuron in self.neural_net.get_output_neuron_indices():
+        #             innovation_id_map[(input_neuron, output_neuron)] = innovation_counter
+        #             innovation_counter += 1
 
         for input_neuron in self.neural_net.get_input_neuron_indices():
             for output_neuron in self.neural_net.get_output_neuron_indices():
                 self.neural_net.connect_neurons(input_neuron, output_neuron, np.random.ranf())
 
     def __get_inovation_id(self, neuron1, neuron2):
-        global  innovation_id_map, innovation_counter
+        global innovation_id_map, innovation_counter
         if (neuron1, neuron2) not in innovation_id_map:
-            innovation_id_map[(neuron1,neuron2)] = innovation_counter
+            innovation_id_map[(neuron1, neuron2)] = innovation_counter
             innovation_counter += 1
-        return innovation_id_map[(neuron1,neuron2)]
+        return innovation_id_map[(neuron1, neuron2)]
 
     def assign_species(self, species_id):
         self.species_id = species_id
@@ -49,7 +49,7 @@ class Organism:
         gene_intersection, indices_a, indices_b = np.intersect1d(self.gene_ids, other_organism.gene_ids, return_indices=True)
         different_genes = max(len(self.gene_ids) - len(indices_a), len(other_organism.gene_ids) - len(indices_b))
         weight_difference = np.abs(self.gene_weights[indices_a] - other_organism.gene_weights[indices_b])
-        longest_genome = max(len(self.gene_ids), len(other_organism.gene_ids)) - self.start_gene_count
+        longest_genome = max(len(self.gene_ids), len(other_organism.gene_ids))
         weight_difference = np.mean(weight_difference)
         different_genes = different_genes / (1+longest_genome)
         return gene_coeff * different_genes + weight_coeff * weight_difference
@@ -69,7 +69,7 @@ class Organism:
 
             connected_neurons = self.neural_net.get_connected_neurons(neuron1)[0]
             if len(connected_neurons) is 0:
-                print('au buraz')
+                print('WARN: Attempted to add neuron to invalid connection')
             neuron2 = np.random.choice(connected_neurons)
             prev_weight = self.neural_net.get_weight(neuron1,neuron2)
 

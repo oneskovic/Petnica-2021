@@ -4,13 +4,20 @@ import glob
 import os
 import matplotlib.pyplot as plt
 import time
+import gym
+from evaluator import Evaluator
 
 plt.ion()
 while True:
-    list_of_files = sorted(glob.glob('data/run 2021_08_05 16_59_43/*'),key=os.path.getctime)
+    list_of_files = sorted(glob.glob('data/run 2021_08_10 17_34_12/*'),key=os.path.getctime)
     latest_file_name = list_of_files[-1]
     data_file = open(latest_file_name, 'rb')
     logger = pickle.load(data_file)
+
+    evaluator = logger.logged_values['problem_params'][0]['evaluator']
+    last_gen = list(logger.logged_values['best_organism'].keys())[-1]
+    #evaluator.evaluate_organism(logger.logged_values['best_organism'][last_gen],True)
+
     plt.subplot(211)
     plt.cla()
     plt.plot([len(v) for v in logger.logged_values['species_sizes'].values()])

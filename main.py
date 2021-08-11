@@ -13,8 +13,8 @@ from utility.logger import Logger
 from mpi4py import MPI
 
 from utility.env_utility import preview
-# preview('Acrobot-v1')
-environment = gym.make('Acrobot-v1')
+preview('Pendulum-v0')
+environment = gym.make('Pendulum-v0')
 
 
 def train(hparams):
@@ -23,7 +23,7 @@ def train(hparams):
         'output_layer_size': 3,
         'evaluator': Evaluator(environment, hparams)
     }
-    generation_cnt = 500
+    generation_cnt = 150
 
     logger = Logger()
     ga = GeneticAlgorithm(hparams, problem_params, logger)
@@ -32,7 +32,7 @@ def train(hparams):
     run_folder = f'data/run {timestamp}'
     os.makedirs(run_folder)
     for generation_number in range(generation_cnt):
-        print(f'Starting generation {generation_number}')
+        print(f'Starting generation {generation_number}', flush=True)
         ga.step_generation()
         file_name = f'{run_folder}/data generation {generation_number}.pk1'
         logger_out_file = open(file_name, 'wb+')
@@ -99,35 +99,36 @@ mpi_size = mpi_comm.Get_size()
 mpi_rank = mpi_comm.Get_rank()
 
 hparams = {
-    'population_size': 200,
+    'population_size': 1000,
     'gene_coeff': 1.0,                      # Weigh the importance of gene differences
     'weight_coeff': 0.0,                    # Unused
     'species_threshold_precision': 0.05,    # Precision when searching for species threshold
-    'prob_multiobjective': 0.5,
-    'prob_mutate': 0.5,                     # Probability of mutation
+    'prob_multiobjective': 0.8,
+    'prob_mutate': 1.0,                     # Probability of mutation
     'prob_mutate_add_neuron': 0.25,         # If a mutation occurs the probability of adding a new neuron
     'prob_mutate_add_connection': 0.25,     # If a mutation occurs the probability of adding a new connection
     'prob_mutate_change_activation': 0.5,   # If a mutation occurs the probability of changing a neuron activation
     'dieoff_fraction': 0.0,                 # Unused
     'offspring_weighing': 'linear',         # Options: linear, exponential (1/x)
     'tournament_size': 8,                   # The size of tournament used in parent selection
-    'species_count': 5,                     # The upper bound on species count
-    'eval_episodes': 6,
+    'species_count': 1,                     # The upper bound on species count
+    'eval_episodes': 3,
     'eval_weights': [-2, -1, -0.5, 0.5, 1, 2],
-    'thread_count': 4,                      # Unused
+    'thread_count': 14,
+    'mutate_amount': 0.05,                  # Unused
     'stagnation_start': 4                   # Number of generations after which a species will be penalized for stagnation
 }
 
-train(hparams)
-# if mpi_rank == 0:
-#     train(hparams)
-# else:
-#     while True:
-#         # print(mpi_rank)
-#         population_to_eval = mpi_comm.recv(source=0, tag=1)
-#         # print(f'{mpi_rank} Recieved population to eval of size {len(population_to_eval)}')
-#         evaluator = Evaluator(environment, hparams)
-#         scores = np.zeros((len(population_to_eval),evaluator.get_objective_count()))
-#         for i in range(len(population_to_eval)):
-#             scores[i] = evaluator.evaluate_organism(population_to_eval[i])
-#         mpi_comm.send(scores, dest=0, tag=1)
+# train(hparams)
+if mpi_rank == 0:
+    train(hparams)
+else:
+    while True:
+        # print(mpi_rank)
+        population_to_eval = mpi_comm.recv(source=0, tag=1)
+        # print(f'{mpi_rank} Recieved population to eval of size {len(population_to_eval)}')
+        evaluator = Evaluator(environment, hparams)
+        scores = np.zeros((len(population_to_eval),evaluator.get_objective_count()))
+        for i in range(len(population_to_eval)):
+            scores[i] = evaluator.evaluate_organism(population_to_eval[i])
+        mpi_comm.send(scores, dest=0, tag=1)
