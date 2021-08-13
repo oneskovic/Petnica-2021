@@ -15,7 +15,7 @@ class NeuralNetwork:
         for _ in range(input_size):                                             # Add input neurons
             self.computation_graph.add_node(identity_function)
         for _ in range(output_size):                                            # Add output neurons
-            self.computation_graph.add_node(sigmoid_function)
+            self.computation_graph.add_node(identity_function)
         for _ in range(self.neuron_count):
             self.computation_graph.add_node(identity_function)
 

@@ -1,8 +1,7 @@
 import gym
 
 
-def preview(env_name):
-    env = gym.make(env_name)
+def preview(env):
     print(env.action_space)
     print(env.observation_space)
 

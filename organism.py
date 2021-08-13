@@ -13,10 +13,8 @@ class Organism:
         self.gene_ids = np.array(0)
         self.gene_weights = np.random.rand(input_layer_size*output_layer_size)
         self.start_gene_count = input_layer_size * output_layer_size
-        self.species_id = None
         self.fitness = None
         self.rank = None
-        self.is_seed_organism = False
 
         global innovation_id_map, innovation_counter
         # if innovation_counter == 0:
@@ -35,15 +33,6 @@ class Organism:
             innovation_id_map[(neuron1, neuron2)] = innovation_counter
             innovation_counter += 1
         return innovation_id_map[(neuron1, neuron2)]
-
-    def assign_species(self, species_id):
-        self.species_id = species_id
-
-    def assign_fitness(self, fitness):
-        self.fitness = fitness
-
-    def assign_seed(self):
-        self.is_seed_organism = True
 
     def get_distance_from(self, other_organism, gene_coeff, weight_coeff):
         gene_intersection, indices_a, indices_b = np.intersect1d(self.gene_ids, other_organism.gene_ids, return_indices=True)
@@ -91,9 +80,6 @@ class Organism:
         else:
             neuron1 = np.random.choice(self.neural_net.non_output_neurons)
             self.neural_net.computation_graph.function_list[neuron1] = np.random.choice(all_activation_functions)
-
-        self.assign_species(None)
-
 
     def crossover(self, other_parent):
         fittest_parent = self

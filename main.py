@@ -13,23 +13,25 @@ from utility.logger import Logger
 from mpi4py import MPI
 
 from utility.env_utility import preview
-preview('Pendulum-v0')
-environment = gym.make('Pendulum-v0')
+from cartpole_swingup import CartPoleSwingUpEnv
+
+environment = CartPoleSwingUpEnv()
+preview(environment)
 
 
 def train(hparams):
     problem_params = {
-        'input_layer_size': 6,
-        'output_layer_size': 3,
+        'input_layer_size': 5,
+        'output_layer_size': 1,
         'evaluator': Evaluator(environment, hparams)
     }
-    generation_cnt = 150
+    generation_cnt = 500
 
     logger = Logger()
     ga = GeneticAlgorithm(hparams, problem_params, logger)
 
     timestamp = datetime.datetime.now().strftime('%Y_%m_%d %H_%M_%S')
-    run_folder = f'data/run {timestamp}'
+    run_folder = f'data/cartpole_swingup/run {timestamp}'
     os.makedirs(run_folder)
     for generation_number in range(generation_cnt):
         print(f'Starting generation {generation_number}', flush=True)
@@ -99,10 +101,9 @@ mpi_size = mpi_comm.Get_size()
 mpi_rank = mpi_comm.Get_rank()
 
 hparams = {
-    'population_size': 1000,
+    'population_size': 500,
     'gene_coeff': 1.0,                      # Weigh the importance of gene differences
     'weight_coeff': 0.0,                    # Unused
-    'species_threshold_precision': 0.05,    # Precision when searching for species threshold
     'prob_multiobjective': 0.8,
     'prob_mutate': 1.0,                     # Probability of mutation
     'prob_mutate_add_neuron': 0.25,         # If a mutation occurs the probability of adding a new neuron
@@ -111,11 +112,9 @@ hparams = {
     'dieoff_fraction': 0.0,                 # Unused
     'offspring_weighing': 'linear',         # Options: linear, exponential (1/x)
     'tournament_size': 8,                   # The size of tournament used in parent selection
-    'species_count': 1,                     # The upper bound on species count
     'eval_episodes': 3,
     'eval_weights': [-2, -1, -0.5, 0.5, 1, 2],
     'thread_count': 14,
-    'mutate_amount': 0.05,                  # Unused
     'stagnation_start': 4                   # Number of generations after which a species will be penalized for stagnation
 }
 
