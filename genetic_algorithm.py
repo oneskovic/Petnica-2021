@@ -26,24 +26,31 @@ class GeneticAlgorithm:
         input_layer_size = self.problem_params['input_layer_size']
         output_layer_size = self.problem_params['output_layer_size']
         self.population = [Organism(input_layer_size, output_layer_size) for _ in range(population_size)]
-        print('Generating starting population...')
-        #self.__create_good_starting_pop()
-        self.population = self.__generate_random_pop(self.hparams['population_size'])
+        for organism in self.population:
+            nn = organism.neural_net
+            for input_neuron in nn.input_neurons:
+                for output_neuron in nn.output_neurons:
+                    if np.random.ranf() <= 0.5:
+                        organism.mutate_nonrecurrent(1, self.logger, self.generation_number)
+
+            # Make sure there is at least one connection
+            organism.mutate_nonrecurrent(1, self.logger, self.generation_number)
+            # Add a single hidden neuron
+            organism.mutate_nonrecurrent(0, self.logger, self.generation_number)
 
         self.__evaluate_population(self.population)
 
         all_scores = np.array([organism.fitness for organism in self.population])
-
         if np.random.ranf() < self.hparams['prob_multiobjective']:
-            organism_index_rank = nsga_sort(all_scores)  # Get positions of organisms in the sorted array
-            for i in range(len(organism_index_rank)):
-                self.population[i].rank = organism_index_rank[i]
-            self.multi_objective_sort = True
+            all_scores = all_scores[:, [0, 1]]
         else:
-            argsort = np.argsort(-all_scores[:, 0])
-            for i in range(len(argsort)):
-                self.population[argsort[i]].rank = i
-            self.multi_objective_sort = False
+            all_scores = all_scores[:, [0, 2]]
+
+        organism_index_rank = nsga_sort(all_scores)
+        for i in range(len(organism_index_rank)):
+            self.population[i].rank = organism_index_rank[i]
+        self.multi_objective_sort = True
+
         self.population.sort(key=operator.attrgetter('rank'))
 
     def __generate_random_pop(self, count):
@@ -103,7 +110,7 @@ class GeneticAlgorithm:
                 new_organism = parent1.crossover(parent2)
 
             # for _ in range(max(5, math.ceil(self.hparams['mutate_amount'] * len(new_organism.gene_ids)))):
-            new_organism.mutate(self.hparams)
+            new_organism.mutate(self.hparams, self.logger, self.generation_number)
             offspring.append(new_organism)
         return offspring
 
@@ -119,10 +126,13 @@ class GeneticAlgorithm:
         best_organism = deepcopy(self.population[0])
 
         self.logger.log_value('scores', self.generation_number, scores)
-        self.logger.log_value('genomes', self.generation_number, genomes)
         self.logger.log_value('best_organism', self.generation_number, best_organism)
         self.logger.log_value('hparams', 0, deepcopy(self.hparams))
         self.logger.log_value('problem_params', 0, deepcopy(self.problem_params))
+
+        if self.logger.detailed:
+            self.logger.log_value('genomes', self.generation_number, genomes)
+            self.logger.log_value('organisms', self.generation_number, deepcopy(self.population))
 
     def step_generation(self):
         self.__get_stats()
@@ -136,33 +146,45 @@ class GeneticAlgorithm:
             print(debug_arr)
             print('WARN: Population not sorted by rank!')
 
-        new_organisms = self.__create_offspring(np.arange(0, len(self.population)), self.hparams['population_size'])
-        self.__evaluate_population(new_organisms)
+        remove_count = int(self.hparams['dieoff_fraction']*len(self.population))
+        elite_count = int(self.hparams['elite_fraction']*len(self.population))
 
-        self.population = self.population + new_organisms           # Join the old population with the new population
+        if remove_count > 0:
+            del self.population[-remove_count:]
+
+        elite_organisms = list([])
+        elite_count = min(elite_count, len(self.population))
+        if elite_count > 0:
+            elite_organisms = self.population[:elite_count]
+
+        new_organisms = self.__create_offspring(np.arange(0, len(self.population)),
+                                                self.hparams['population_size']-elite_count)
+
+        self.population = elite_organisms + new_organisms           # Join the elite population with the new population
+        self.__evaluate_population(self.population)
+
+        # all_scores[i][0] = average reward
+        # all_scores[i][1] = max average reward
+        # all_scores[i][2] = number of connections (genes)
         all_scores = np.array([organism.fitness for organism in self.population])
-
         if np.random.ranf() < self.hparams['prob_multiobjective']:
-            organism_index_rank = nsga_sort(all_scores)             # Get positions of organisms in the sorted array
-            for i in range(len(organism_index_rank)):
-                self.population[i].rank = organism_index_rank[i]
-            self.multi_objective_sort = True
+            all_scores = all_scores[:, [0, 1]]
         else:
-            argsort = np.argsort(-all_scores[:, 0])
-            organism_index_rank = np.zeros(len(argsort), dtype=int)
-            for i in range(len(argsort)):
-                self.population[argsort[i]].rank = i
-                organism_index_rank[argsort[i]] = i
-            self.multi_objective_sort = False
+            all_scores = all_scores[:, [0, 2]]
+
+        organism_index_rank = nsga_sort(all_scores)
+        for i in range(len(organism_index_rank)):
+            self.population[i].rank = organism_index_rank[i]
+        self.multi_objective_sort = True
 
         self.population.sort(key=operator.attrgetter('rank'))
-        ranks = np.array(np.arange(1, len(self.population)+1), dtype=np.float64)
-        ranks -= max(ranks)
-        ranks = np.abs(ranks)
-        ranks += 1
-        ranks /= ranks.sum()
-        chosen = default_rng().choice(self.population, self.hparams['population_size'], replace=False, p=ranks)
-
-        self.population = list(chosen)
-        self.population.sort(key=operator.attrgetter('rank'))
+        # ranks = np.array(np.arange(1, len(self.population)+1), dtype=np.float64)
+        # ranks -= max(ranks)
+        # ranks = np.abs(ranks)
+        # ranks += 1
+        # ranks /= ranks.sum()
+        # chosen = default_rng().choice(self.population, self.hparams['population_size'], replace=False, p=ranks)
+        #self.population = self.population[:self.hparams['population_size']]
+        if len(self.population) != self.hparams['population_size']:
+            raise ValueError('Incorrect population size!')
         self.generation_number += 1

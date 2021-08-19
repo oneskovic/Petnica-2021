@@ -3,6 +3,8 @@ from numpy import ndarray
 
 class ComputationGraph:
 
+    transpose_adjacency_matrix: ndarray
+
     def __init__(self):
         self.transpose_adjacency_matrix = None
         self.function_list = list()
@@ -40,6 +42,14 @@ class ComputationGraph:
         self.node_values = self.node_values * weight
         for i in range(len(self.node_values)):
             self.node_values[i] = self.function_list[i](self.node_values[i])
+
+    def evaluate_with_layers(self, weight, layers):
+        for layer_index in range(1,len(layers)):
+            for node in layers[layer_index]:
+                sum = np.matmul(self.transpose_adjacency_matrix[node], self.node_values)
+                sum *= weight
+                sum += 1.0*weight               # Add bias
+                self.node_values[node] = self.function_list[node](sum)
 
     def get_node_value(self, node):
         return self.node_values[node]

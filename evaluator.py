@@ -16,44 +16,40 @@ class Evaluator:
         self.hparams = hparams
 
     def evaluate_organism(self, organism, render_env=False):
-        avg_reward = 0.0
-        # all_episode_actions = [list() for _ in range(self.hparams['eval_episodes'])]
-        # all_episode_obs = [list() for _ in range(self.hparams['eval_episodes'])]
 
         different_weight_count = len(self.hparams['eval_weights'])
         total_episode_cnt = self.hparams['eval_episodes']*different_weight_count
-        for i_episode in range(different_weight_count):
-            observation = self.eval_env.reset()
-            shared_weight_value = self.hparams['eval_weights'][i_episode]
+        avg_reward = np.zeros(different_weight_count)
+        for weight_index in range(different_weight_count):
+            shared_weight_value = self.hparams['eval_weights'][weight_index]
             nn: NeuralNetwork = organism.neural_net
             nn.set_shared_weight(shared_weight_value)
             nn.clear_network()
 
             for _ in range(self.hparams['eval_episodes']):
+                observation = self.eval_env.reset()
                 total_reward = 0.0
-                for t in range(200):
+                for t in range(1000):
                     if render_env:
                         self.eval_env.render()
+                    nn.clear_network()
                     nn.set_input(observation)
                     output_layer = nn.compute_activations()
                     if math.isnan(output_layer):
                         output_layer = np.array([0])
-                    action = 2.0/(1+np.exp(-output_layer)) - 1.0
-
-                    # all_episode_actions[i_episode].append(action)
-                    # all_episode_obs[i_episode].append(observation)
+                    action = output_layer
 
                     observation, reward, done, info = self.eval_env.step(action)
                     total_reward += reward
                     if done:
                         #print("Episode finished after {} timesteps".format(t + 1))
                         break
-                avg_reward += total_reward / total_episode_cnt
+                avg_reward[weight_index] += total_reward / self.hparams['eval_episodes']
         self.eval_env.close()
-        return np.array([avg_reward, min(-(len(organism.gene_ids) - organism.start_gene_count), -1)])
+        return np.array([avg_reward.mean(), avg_reward.max(), 1.0/max((len(organism.gene_ids),1))])
 
     def get_objective_count(self):
-        return 2
+        return 3
 
     def evaluate_population_parallel(self, population: List[Organism]):
         print('Evaluating population...', flush=True)

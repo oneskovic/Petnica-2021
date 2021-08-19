@@ -16,7 +16,7 @@ from utility.env_utility import preview
 from cartpole_swingup import CartPoleSwingUpEnv
 
 environment = CartPoleSwingUpEnv()
-preview(environment)
+#preview(environment)
 
 
 def train(hparams):
@@ -25,7 +25,7 @@ def train(hparams):
         'output_layer_size': 1,
         'evaluator': Evaluator(environment, hparams)
     }
-    generation_cnt = 500
+    generation_cnt = 1000
 
     logger = Logger()
     ga = GeneticAlgorithm(hparams, problem_params, logger)
@@ -101,24 +101,26 @@ mpi_size = mpi_comm.Get_size()
 mpi_rank = mpi_comm.Get_rank()
 
 hparams = {
-    'population_size': 500,
+    'population_size': 64,
     'gene_coeff': 1.0,                      # Weigh the importance of gene differences
-    'weight_coeff': 0.0,                    # Unused
+    'weight_coeff': 0.0,                    # Weight agnostic, so leave at zero
     'prob_multiobjective': 0.8,
     'prob_mutate': 1.0,                     # Probability of mutation
     'prob_mutate_add_neuron': 0.25,         # If a mutation occurs the probability of adding a new neuron
     'prob_mutate_add_connection': 0.25,     # If a mutation occurs the probability of adding a new connection
     'prob_mutate_change_activation': 0.5,   # If a mutation occurs the probability of changing a neuron activation
-    'dieoff_fraction': 0.0,                 # Unused
+    'dieoff_fraction': 0.2,                 # The fraction of population that is discarded once sorted
+    'elite_fraction': 0.05,                 # The fraction of population that is kept unchanged once sorted
     'offspring_weighing': 'linear',         # Options: linear, exponential (1/x)
     'tournament_size': 8,                   # The size of tournament used in parent selection
     'eval_episodes': 3,
     'eval_weights': [-2, -1, -0.5, 0.5, 1, 2],
     'thread_count': 14,
-    'stagnation_start': 4                   # Number of generations after which a species will be penalized for stagnation
 }
 
 # train(hparams)
+# print(os.getpid(), flush=True)
+# time.sleep(30)
 if mpi_rank == 0:
     train(hparams)
 else:
