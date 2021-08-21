@@ -8,25 +8,14 @@ class NeuralNetwork:
         self.neuron_count = input_size+output_size
         self.input_neurons = np.array(range(0, input_size))
         self.output_neurons = np.array(range(input_size, input_size + output_size))
-        self.bias_neurons = np.array(range(self.neuron_count, 2*self.neuron_count))
         self.non_output_neurons = np.array(self.input_neurons)
+        self.hidden_neurons = np.zeros(0, dtype=int)
         self.computation_graph = ComputationGraph()
         self.shared_weight = 0.0
         for _ in range(input_size):                                             # Add input neurons
             self.computation_graph.add_node(identity_function)
         for _ in range(output_size):                                            # Add output neurons
             self.computation_graph.add_node(identity_function)
-        for _ in range(self.neuron_count):
-            self.computation_graph.add_node(identity_function)
-
-        for input_neuron in self.input_neurons:
-            for output_neuron in self.output_neurons:
-                self.computation_graph.add_edge(input_neuron, output_neuron, 1)
-        all_neurons = np.append(self.input_neurons, self.output_neurons)
-        for i in range(len(all_neurons)):
-            self.computation_graph.add_edge(self.bias_neurons[i], all_neurons[i], 1)
-
-
 
     def add_neuron(self, neuron1, neuron2, activation_function):
         """
@@ -42,22 +31,21 @@ class NeuralNetwork:
         self.computation_graph.add_edge(new_node, neuron2, old_weight)
         self.computation_graph.remove_edge(neuron1, neuron2)
 
-        bias_node = self.computation_graph.add_node(identity_function)
-        self.computation_graph.add_edge(bias_node, new_node, 1)
-
         self.neuron_count += 1
         self.non_output_neurons = np.append(self.non_output_neurons, new_node)
-        self.bias_neurons = np.append(self.bias_neurons, bias_node)
+        self.hidden_neurons = np.append(self.hidden_neurons, new_node)
+
         return new_node
 
     def connect_neurons(self, neuron1, neuron2, weight):
         return self.computation_graph.add_edge(neuron1, neuron2, weight)
 
+    def disconnect_neurons(self, neuron1, neuron2):
+        self.computation_graph.remove_edge(neuron1, neuron2)
+
     def set_input(self, input_data):
         for i in range(len(input_data)):
             self.computation_graph.set_node_value(self.input_neurons[i], input_data[i])
-        for i in range(len(self.bias_neurons)):
-            self.computation_graph.set_node_value(self.bias_neurons[i], 1)
 
     def clear_network(self):
         self.computation_graph.set_node_values(np.zeros_like(self.computation_graph.get_node_values()))
@@ -88,6 +76,18 @@ class NeuralNetwork:
 
     def get_weight(self, neuron1, index):
         return self.computation_graph.get_weight_with_index(neuron1, index)
+
+    def get_disconnected_neurons(self):
+        transpose_adj = self.computation_graph.transpose_adjacency_matrix
+        n = transpose_adj.shape[0]
+        # Disallow recurrent connections to the same neuron
+        transpose_adj = np.logical_or(self.computation_graph.transpose_adjacency_matrix, np.identity(n))
+        neurons2, neurons1 = np.where(transpose_adj == 0)
+        return neurons1, neurons2
+
+    def get_all_connected_neurons(self):
+        neurons2, neurons1 = np.nonzero(self.computation_graph.transpose_adjacency_matrix)
+        return neurons1, neurons2
 
     def set_shared_weight(self, weight):
         self.shared_weight = weight

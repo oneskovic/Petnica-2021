@@ -40,6 +40,7 @@ class ComputationGraph:
     def evaluate(self, weight):
         self.node_values = np.matmul(self.transpose_adjacency_matrix,self.node_values)
         self.node_values = self.node_values * weight
+        self.node_values += 1.0*weight
         for i in range(len(self.node_values)):
             self.node_values[i] = self.function_list[i](self.node_values[i])
 

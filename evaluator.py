@@ -32,7 +32,7 @@ class Evaluator:
                 for t in range(1000):
                     if render_env:
                         self.eval_env.render()
-                    nn.clear_network()
+                    # nn.clear_network()
                     nn.set_input(observation)
                     output_layer = nn.compute_activations()
                     if math.isnan(output_layer):

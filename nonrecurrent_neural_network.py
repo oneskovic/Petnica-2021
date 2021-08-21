@@ -115,13 +115,15 @@ class NeuralNetwork:
         return self.computation_graph.get_weight_with_index(neuron1, index)
 
     def get_disconnected_neurons(self):
-        disconnected = list()
+        neurons1 = np.array([],dtype=int)
+        neurons2 = np.array([],dtype=int)
         for neuron1 in np.append(self.input_neurons,self.hidden_neurons):
             for neuron2 in np.append(self.hidden_neurons, self.output_neurons):
                 are_connected = self.computation_graph.transpose_adjacency_matrix[neuron2][neuron1]
                 if self.neuron_layer_map[neuron1] < self.neuron_layer_map[neuron2] and not are_connected:
-                    disconnected.append((neuron1,neuron2))
-        return disconnected
+                    neurons1 = np.append(neurons1, neuron1)
+                    neurons2 = np.append(neurons2, neuron2)
+        return neurons1, neurons2
 
     def set_shared_weight(self, weight):
         self.shared_weight = weight

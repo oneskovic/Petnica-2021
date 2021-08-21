@@ -9,7 +9,7 @@ from evaluator import Evaluator
 
 plt.ion()
 while True:
-    list_of_files = sorted(glob.glob('data/cartpole_swingup/run 2021_08_18 23_33_29/*'), key=os.path.getctime)
+    list_of_files = sorted(glob.glob('data/cartpole_swingup/recurrent wann run 2021_08_21 13_14_37/*'), key=os.path.getctime)
     latest_file_name = list_of_files[-1]
     data_file = open(latest_file_name, 'rb')
     logger = pickle.load(data_file)

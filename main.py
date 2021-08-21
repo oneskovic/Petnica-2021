@@ -31,7 +31,7 @@ def train(hparams):
     ga = GeneticAlgorithm(hparams, problem_params, logger)
 
     timestamp = datetime.datetime.now().strftime('%Y_%m_%d %H_%M_%S')
-    run_folder = f'data/cartpole_swingup/run {timestamp}'
+    run_folder = f'data/cartpole_swingup/recurrent wann run {timestamp}'
     os.makedirs(run_folder)
     for generation_number in range(generation_cnt):
         print(f'Starting generation {generation_number}', flush=True)
@@ -60,7 +60,6 @@ def objective(trial):
         'output_layer_size': 3,
         'evaluator': Evaluator(environment, hparams)
     }
-
 
     generation_cnt = 100
     ga = GeneticAlgorithm(hparams, problem_params)
@@ -101,16 +100,17 @@ mpi_size = mpi_comm.Get_size()
 mpi_rank = mpi_comm.Get_rank()
 
 hparams = {
-    'population_size': 64,
+    'population_size': 256,
     'gene_coeff': 1.0,                      # Weigh the importance of gene differences
     'weight_coeff': 0.0,                    # Weight agnostic, so leave at zero
     'prob_multiobjective': 0.8,
     'prob_mutate': 1.0,                     # Probability of mutation
     'prob_mutate_add_neuron': 0.25,         # If a mutation occurs the probability of adding a new neuron
-    'prob_mutate_add_connection': 0.25,     # If a mutation occurs the probability of adding a new connection
+    'prob_mutate_add_connection': 0.125,    # If a mutation occurs the probability of adding a new connection
+    'prob_remove_connection': 0.125,
     'prob_mutate_change_activation': 0.5,   # If a mutation occurs the probability of changing a neuron activation
     'dieoff_fraction': 0.2,                 # The fraction of population that is discarded once sorted
-    'elite_fraction': 0.05,                 # The fraction of population that is kept unchanged once sorted
+    'elite_fraction': 0.2,                  # The fraction of population that is kept unchanged once sorted
     'offspring_weighing': 'linear',         # Options: linear, exponential (1/x)
     'tournament_size': 8,                   # The size of tournament used in parent selection
     'eval_episodes': 3,

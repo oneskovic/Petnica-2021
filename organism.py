@@ -19,7 +19,6 @@ class Organism:
 
         self.recurrent = recurrent
         self.gene_ids = np.array([], dtype=int)
-        self.gene_weights = np.random.rand(input_layer_size*output_layer_size)
         self.start_gene_count = 0
         self.fitness = None
         self.rank = None
@@ -40,40 +39,9 @@ class Organism:
         gene_intersection, indices_a, indices_b = np.intersect1d(self.gene_ids, other_organism.gene_ids, return_indices=True)
 
         different_genes = max(len(self.gene_ids) - len(indices_a), len(other_organism.gene_ids) - len(indices_b))
-        weight_difference = np.abs(self.gene_weights[indices_a] - other_organism.gene_weights[indices_b])
         longest_genome = max(len(self.gene_ids), len(other_organism.gene_ids))
-        weight_difference = np.mean(weight_difference)
         different_genes = different_genes / (1+longest_genome)
-        return gene_coeff * different_genes + weight_coeff * weight_difference
-
-    def __mutate_recurrent(self, mutation_id):
-        if mutation_id == 0:
-            neuron1 = np.random.choice(self.neural_net.get_non_output_neurons())
-
-            connected_neurons = self.neural_net.get_connected_neurons(neuron1)[0]
-            if len(connected_neurons) is 0:
-                raise ValueError('Attempted to add neuron to invalid connection')
-            neuron2 = np.random.choice(connected_neurons)
-            prev_weight = self.neural_net.get_weight(neuron1,neuron2)
-
-            function = np.random.choice(all_activation_functions)
-            new_neuron = self.neural_net.add_neuron(neuron1, neuron2, function)
-
-            self.gene_ids = np.append(self.gene_ids,
-                  [self.__get_inovation_id(neuron1, new_neuron),self.__get_inovation_id(new_neuron, neuron2)])
-            self.gene_weights = np.append(self.gene_weights, [prev_weight, prev_weight])
-
-        elif mutation_id == 1:
-            neuron1 = np.random.choice(self.neural_net.non_output_neurons)
-            neuron2 = np.random.choice(self.neural_net.non_output_neurons)
-            self.neural_net.connect_neurons(neuron1, neuron2, 1)
-
-            self.gene_ids = np.append(self.gene_ids, self.__get_inovation_id(neuron1, neuron2))
-            self.gene_weights = np.append(self.gene_weights, 1)
-
-        else:
-            neuron1 = np.random.choice(self.neural_net.non_output_neurons)
-            self.neural_net.computation_graph.function_list[neuron1] = np.random.choice(all_activation_functions)
+        return gene_coeff * different_genes
 
     def mutate_nonrecurrent(self, mutation_id, logger=None, generation_number=0):
         if mutation_id == 0:        # Add a neuron into an existing connection
@@ -100,29 +68,38 @@ class Organism:
             innovation_id1 = self.__get_inovation_id(neuron1, new_neuron)
             innovation_id2 = self.__get_inovation_id(new_neuron, neuron2)
 
-            if innovation_id1 in self.gene_ids or innovation_id2 in self.gene_ids:
-                pass
             self.gene_ids = np.append(self.gene_ids,
                   np.array([innovation_id1, innovation_id2]))
-            self.gene_weights = np.append(self.gene_weights, [prev_weight, prev_weight])
 
         elif mutation_id == 1:      # Add a new connection
-            disconnected = self.neural_net.get_disconnected_neurons()
-            if len(disconnected) == 0:
+            neurons1, neurons2 = self.neural_net.get_disconnected_neurons()
+            if len(neurons1) == 0:
                 if logger is None:
                     print('WARN: All neurons connected - mutation failed')
                 else:
                     logger.log_msg('WARN: All neurons connected - mutation failed', generation_number)
                 return
-            neurons = disconnected[np.random.randint(0, len(disconnected))]
+            rand_index = np.random.randint(0, len(neurons1))
 
-            self.neural_net.connect_neurons(neurons[0], neurons[1], 1)
+            self.neural_net.connect_neurons(neurons1[rand_index], neurons2[rand_index], 1)
 
-            innovation_id = self.__get_inovation_id(neurons[0], neurons[1])
+            innovation_id = self.__get_inovation_id(neurons1[rand_index], neurons2[rand_index])
             if innovation_id in self.gene_ids:
                 pass
             self.gene_ids = np.append(self.gene_ids, innovation_id)
-            self.gene_weights = np.append(self.gene_weights, 1)
+
+        elif mutation_id == 2:      # Delete a connection
+            neurons1, neurons2 = self.neural_net.get_all_connected_neurons()
+            if len(neurons1) == 0:
+                if logger is None:
+                    print('WARN: All neurons disconnected - mutation failed')
+                else:
+                    logger.log_msg('WARN: All neurons disconnected - mutation failed', generation_number)
+                return
+            rand_index = np.random.randint(0, len(neurons1))
+            self.neural_net.disconnect_neurons(neurons1[rand_index], neurons2[rand_index])
+            innovation_id = self.__get_inovation_id(neurons1[rand_index], neurons2[rand_index])
+            self.gene_ids = np.delete(self.gene_ids, np.where(self.gene_ids == innovation_id)[0])
 
         else:                       # Change activation function
             if len(self.neural_net.hidden_neurons) == 0:
@@ -141,14 +118,12 @@ class Organism:
         Change actiavation function (with probability given in hparams).
         Assign species to None.
         """
-        mutation_id = np.random.choice([0,1,2], p=[hparams['prob_mutate_add_neuron'],
-                                        hparams['prob_mutate_add_connection'],
-                                        hparams['prob_mutate_change_activation']])
+        mutation_id = np.random.choice([0,1,2,3], p=[hparams['prob_mutate_add_neuron'],
+                                                     hparams['prob_mutate_add_connection'],
+                                                     hparams['prob_remove_connection'],
+                                                     hparams['prob_mutate_change_activation']])
 
-        if self.recurrent:
-            self.__mutate_recurrent(mutation_id)
-        else:
-            self.mutate_nonrecurrent(mutation_id, logger, generation_number)
+        self.mutate_nonrecurrent(mutation_id, logger, generation_number)
 
     def crossover(self, other_parent):
         fittest_parent = self
@@ -162,20 +137,7 @@ class Organism:
             if np.random.ranf() < 0.5:
                 fittest_parent, less_fit_parent = other_parent, self
 
-
         child = deepcopy(fittest_parent)
-        matching, fitter_intersect_ind, less_fit_intersect_ind = \
-            np.intersect1d(fittest_parent.gene_ids, less_fit_parent.gene_ids , return_indices=True)
-
-        less_fit_prob = 0.5
-        # Boolean array (0 = should not take weight from less fit organism, 1 = should take)
-        take_less_fit = np.random.rand(len(matching)) < less_fit_prob
-        try:
-            child.gene_weights[fitter_intersect_ind[take_less_fit]] = less_fit_parent.gene_weights[less_fit_intersect_ind[take_less_fit]]
-        except:
-            print('au buraz')
-
-        child.assign_species(None)
         return child
 
 

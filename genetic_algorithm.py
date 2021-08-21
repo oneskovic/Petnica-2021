@@ -25,7 +25,7 @@ class GeneticAlgorithm:
     def __init_population(self, population_size):
         input_layer_size = self.problem_params['input_layer_size']
         output_layer_size = self.problem_params['output_layer_size']
-        self.population = [Organism(input_layer_size, output_layer_size) for _ in range(population_size)]
+        self.population = [Organism(input_layer_size, output_layer_size, True) for _ in range(population_size)]
         for organism in self.population:
             nn = organism.neural_net
             for input_neuron in nn.input_neurons:
@@ -178,13 +178,6 @@ class GeneticAlgorithm:
         self.multi_objective_sort = True
 
         self.population.sort(key=operator.attrgetter('rank'))
-        # ranks = np.array(np.arange(1, len(self.population)+1), dtype=np.float64)
-        # ranks -= max(ranks)
-        # ranks = np.abs(ranks)
-        # ranks += 1
-        # ranks /= ranks.sum()
-        # chosen = default_rng().choice(self.population, self.hparams['population_size'], replace=False, p=ranks)
-        #self.population = self.population[:self.hparams['population_size']]
         if len(self.population) != self.hparams['population_size']:
             raise ValueError('Incorrect population size!')
         self.generation_number += 1
