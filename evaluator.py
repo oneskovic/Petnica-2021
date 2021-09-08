@@ -32,7 +32,7 @@ class Evaluator:
                 for t in range(1000):
                     if render_env:
                         self.eval_env.render()
-                    # nn.clear_network()
+                    #nn.clear_network()
                     nn.set_input(observation)
                     output_layer = nn.compute_activations()
                     if math.isnan(output_layer):
@@ -46,7 +46,8 @@ class Evaluator:
                         break
                 avg_reward[weight_index] += total_reward / self.hparams['eval_episodes']
         self.eval_env.close()
-        return np.array([avg_reward.mean(), avg_reward.max(), 1.0/max((len(organism.gene_ids),1))])
+        neuron_cnt = organism.neural_net.neuron_count
+        return np.array([avg_reward.mean(), avg_reward.max(), 1.0/max(neuron_cnt, 1)])
 
     def get_objective_count(self):
         return 3

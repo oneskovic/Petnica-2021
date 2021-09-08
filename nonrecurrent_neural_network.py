@@ -17,10 +17,6 @@ class NeuralNetwork:
         for _ in range(output_size):                                            # Add output neurons
             self.computation_graph.add_node(identity_function)
 
-        # for input_neuron in self.input_neurons:                                 # Connect all input neurons to all output neurons
-        #     for output_neuron in self.output_neurons:
-        #         self.computation_graph.add_edge(input_neuron, output_neuron, 1)
-
         self.layers = list([self.input_neurons, self.output_neurons])
         self.neuron_layer_map = dict()
         for neuron in self.input_neurons:
@@ -48,9 +44,6 @@ class NeuralNetwork:
         self.computation_graph.add_edge(neuron1, new_node, old_weight)
         self.computation_graph.add_edge(new_node, neuron2, old_weight)
         self.computation_graph.remove_edge(neuron1, neuron2)
-
-        bias_node = self.computation_graph.add_node(identity_function)
-        self.computation_graph.add_edge(bias_node, new_node, 1)
 
         self.neuron_count += 1
         self.non_output_neurons = np.append(self.non_output_neurons, new_node)

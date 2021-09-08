@@ -25,13 +25,14 @@ def train(hparams):
         'output_layer_size': 1,
         'evaluator': Evaluator(environment, hparams)
     }
-    generation_cnt = 1000
+    generation_cnt = 150
 
     logger = Logger()
     ga = GeneticAlgorithm(hparams, problem_params, logger)
 
     timestamp = datetime.datetime.now().strftime('%Y_%m_%d %H_%M_%S')
-    run_folder = f'data/cartpole_swingup/recurrent wann run {timestamp}'
+    type_str = "recurrent" if hparams['recurrent_nets'] else "feedforward"
+    run_folder = f'data/cartpole_swingup/{type_str} wann run {timestamp}'
     os.makedirs(run_folder)
     for generation_number in range(generation_cnt):
         print(f'Starting generation {generation_number}', flush=True)
@@ -99,37 +100,44 @@ mpi_comm = MPI.COMM_WORLD
 mpi_size = mpi_comm.Get_size()
 mpi_rank = mpi_comm.Get_rank()
 
-hparams = {
-    'population_size': 256,
-    'gene_coeff': 1.0,                      # Weigh the importance of gene differences
-    'weight_coeff': 0.0,                    # Weight agnostic, so leave at zero
-    'prob_multiobjective': 0.8,
-    'prob_mutate': 1.0,                     # Probability of mutation
-    'prob_mutate_add_neuron': 0.25,         # If a mutation occurs the probability of adding a new neuron
-    'prob_mutate_add_connection': 0.125,    # If a mutation occurs the probability of adding a new connection
-    'prob_remove_connection': 0.125,
-    'prob_mutate_change_activation': 0.5,   # If a mutation occurs the probability of changing a neuron activation
-    'dieoff_fraction': 0.2,                 # The fraction of population that is discarded once sorted
-    'elite_fraction': 0.2,                  # The fraction of population that is kept unchanged once sorted
-    'offspring_weighing': 'linear',         # Options: linear, exponential (1/x)
-    'tournament_size': 8,                   # The size of tournament used in parent selection
-    'eval_episodes': 3,
-    'eval_weights': [-2, -1, -0.5, 0.5, 1, 2],
-    'thread_count': 14,
-}
+for t in range(100):
+    print(f'Starting trial {t}')
+    hparams = {
+        'population_size': 256,
+        'init_connection_fraction': 0.5,
+        'gene_coeff': 1.0,                      # Weigh the importance of gene differences
+        'weight_coeff': 0.0,                    # Weight agnostic, so leave at zero
+        'prob_multiobjective': 0.8,
+        'prob_mutate': 1.0,                     # Probability of mutation
+        'prob_mutate_add_neuron': 0.25,         # If a mutation occurs the probability of adding a new neuron
+        'prob_mutate_add_connection': 0.125,    # If a mutation occurs the probability of adding a new connection
+        'prob_remove_connection': 0.125,
+        'prob_mutate_change_activation': 0.5,   # If a mutation occurs the probability of changing a neuron activation
+        'dieoff_fraction': 0.2,                 # The fraction of population that is discarded once sorted
+        'elite_fraction': 0.2,                  # The fraction of population that is kept unchanged once sorted
+        'offspring_weighing': 'linear',         # Options: linear, exponential (1/x)
+        'tournament_size': 8,                   # The size of tournament used in parent selection
+        'eval_episodes': 3,
+        'eval_weights': [-2, -1, -0.5, 0.5, 1, 2],
+        'thread_count': 14,
+        'recurrent_nets': True,
+        'random_seed': np.random.randint(np.iinfo(int).max)
+    }
 
-# train(hparams)
-# print(os.getpid(), flush=True)
-# time.sleep(30)
-if mpi_rank == 0:
-    train(hparams)
-else:
-    while True:
-        # print(mpi_rank)
-        population_to_eval = mpi_comm.recv(source=0, tag=1)
-        # print(f'{mpi_rank} Recieved population to eval of size {len(population_to_eval)}')
-        evaluator = Evaluator(environment, hparams)
-        scores = np.zeros((len(population_to_eval),evaluator.get_objective_count()))
-        for i in range(len(population_to_eval)):
-            scores[i] = evaluator.evaluate_organism(population_to_eval[i])
-        mpi_comm.send(scores, dest=0, tag=1)
+    if hparams['thread_count'] == 1:
+        train(hparams)
+    else:
+        if mpi_rank == 0:
+            print(f'Master at: {os.getpid()}', flush=True)
+            # time.sleep(30)
+            train(hparams)
+        else:
+            while True:
+                # print(mpi_rank)
+                population_to_eval = mpi_comm.recv(source=0, tag=1)
+                # print(f'{mpi_rank} Recieved population to eval of size {len(population_to_eval)}')
+                evaluator = Evaluator(environment, hparams)
+                scores = np.zeros((len(population_to_eval),evaluator.get_objective_count()))
+                for i in range(len(population_to_eval)):
+                    scores[i] = evaluator.evaluate_organism(population_to_eval[i])
+                mpi_comm.send(scores, dest=0, tag=1)

@@ -3,6 +3,7 @@ import numpy as np
 import nonrecurrent_neural_network
 import recurrent_neural_network
 import utility.activation_functions
+from nonrecurrent_neural_network import NeuralNetwork
 from utility.activation_functions import all_activation_functions
 from copy import deepcopy
 
@@ -11,9 +12,10 @@ innovation_counter = 0
 
 
 class Organism:
-    def __init__(self, input_layer_size, output_layer_size, recurrent=False):
+
+    def __init__(self, input_layer_size, output_layer_size, recurrent, rng):
         if recurrent:
-            self.neural_net = recurrent_neural_network.NeuralNetwork(input_layer_size, output_layer_size)
+            self.neural_net = recurrent_neural_network.NeuralNetwork(input_layer_size, output_layer_size, input_layer_size)
         else:
             self.neural_net = nonrecurrent_neural_network.NeuralNetwork(input_layer_size, output_layer_size)
 
@@ -22,6 +24,7 @@ class Organism:
         self.start_gene_count = 0
         self.fitness = None
         self.rank = None
+        self.rng = rng
 
         # for input_neuron in self.neural_net.get_input_neuron_indices():
         #     for output_neuron in self.neural_net.get_output_neuron_indices():
@@ -54,12 +57,12 @@ class Organism:
                 else:
                     logger.log_msg('WARN: All neurons disconnected - mutation failed', generation_number)
                 return
-            neuron1 = np.random.choice(valid_neurons)
+            neuron1 = self.rng.choice(valid_neurons)
 
             connected_neurons = self.neural_net.get_connected_neurons(neuron1)[0]
             if len(connected_neurons) is 0:
                 raise ValueError('Attempted to add neuron to invalid connection')
-            neuron2 = np.random.choice(connected_neurons)
+            neuron2 = self.rng.choice(connected_neurons)
             prev_weight = self.neural_net.get_weight(neuron1,neuron2)
 
             function = utility.activation_functions.identity_function
@@ -79,7 +82,7 @@ class Organism:
                 else:
                     logger.log_msg('WARN: All neurons connected - mutation failed', generation_number)
                 return
-            rand_index = np.random.randint(0, len(neurons1))
+            rand_index = self.rng.integers(0, len(neurons1))
 
             self.neural_net.connect_neurons(neurons1[rand_index], neurons2[rand_index], 1)
 
@@ -96,7 +99,7 @@ class Organism:
                 else:
                     logger.log_msg('WARN: All neurons disconnected - mutation failed', generation_number)
                 return
-            rand_index = np.random.randint(0, len(neurons1))
+            rand_index = self.rng.integers(0, len(neurons1))
             self.neural_net.disconnect_neurons(neurons1[rand_index], neurons2[rand_index])
             innovation_id = self.__get_inovation_id(neurons1[rand_index], neurons2[rand_index])
             self.gene_ids = np.delete(self.gene_ids, np.where(self.gene_ids == innovation_id)[0])
@@ -108,8 +111,8 @@ class Organism:
                 else:
                     logger.log_msg('WARN: No hidden neurons, could not mutate activations - mutation failed', generation_number)
                 return
-            neuron1 = np.random.choice(self.neural_net.hidden_neurons)
-            self.neural_net.computation_graph.function_list[neuron1] = np.random.choice(all_activation_functions)
+            neuron1 = self.rng.choice(self.neural_net.hidden_neurons)
+            self.neural_net.computation_graph.function_list[neuron1] = self.rng.choice(all_activation_functions)
 
     def mutate(self, hparams, logger=None, generation_number=0):
         """
@@ -118,7 +121,7 @@ class Organism:
         Change actiavation function (with probability given in hparams).
         Assign species to None.
         """
-        mutation_id = np.random.choice([0,1,2,3], p=[hparams['prob_mutate_add_neuron'],
+        mutation_id = self.rng.choice([0,1,2,3], p=[hparams['prob_mutate_add_neuron'],
                                                      hparams['prob_mutate_add_connection'],
                                                      hparams['prob_remove_connection'],
                                                      hparams['prob_mutate_change_activation']])
@@ -134,7 +137,7 @@ class Organism:
         elif (self.fitness > other_parent.fitness).all():
             fittest_parent, less_fit_parent = self, other_parent
         else:   # If ordering is not possible choose randomly which parent is more fit
-            if np.random.ranf() < 0.5:
+            if self.rng.random() < 0.5:
                 fittest_parent, less_fit_parent = other_parent, self
 
         child = deepcopy(fittest_parent)

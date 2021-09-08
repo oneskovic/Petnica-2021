@@ -4,7 +4,6 @@ import numpy as np
 from organism import Organism
 from utility.nsga_sort import nsga_sort
 from copy import deepcopy
-import progressbar
 from utility.logger import Logger
 import operator
 import math
@@ -20,18 +19,31 @@ class GeneticAlgorithm:
         self.hparams = hparams
         self.logger = logger
         self.problem_params = problem_params
+        if 'random_seed' in self.hparams:
+            self.rng = np.random.default_rng(self.hparams['random_seed'])
+            self.problem_params['evaluator'].eval_env.seed(self.hparams['random_seed'])
+        else:
+            self.rng = np.random.default_rng()
         self.__init_population(hparams['population_size'])
 
     def __init_population(self, population_size):
         input_layer_size = self.problem_params['input_layer_size']
         output_layer_size = self.problem_params['output_layer_size']
-        self.population = [Organism(input_layer_size, output_layer_size, True) for _ in range(population_size)]
+        self.population = [Organism(input_layer_size, output_layer_size, self.hparams['recurrent_nets'], self.rng) for _ in range(population_size)]
         for organism in self.population:
             nn = organism.neural_net
-            for input_neuron in nn.input_neurons:
-                for output_neuron in nn.output_neurons:
-                    if np.random.ranf() <= 0.5:
+            if organism.recurrent:
+                connection_cnt = (len(nn.input_neurons) + len(nn.state_input_neurons))*(len(nn.output_neurons) + len(nn.state_output_neurons))
+                connection_cnt *= self.hparams['init_connection_fraction']
+                connection_cnt = int(connection_cnt)
+                for _ in range(connection_cnt):
+                    if self.rng.random() <= 0.5:
                         organism.mutate_nonrecurrent(1, self.logger, self.generation_number)
+            else:
+                for input_neuron in nn.input_neurons:
+                    for output_neuron in nn.output_neurons:
+                        if self.rng.random() <= 0.5:
+                            organism.mutate_nonrecurrent(1, self.logger, self.generation_number)
 
             # Make sure there is at least one connection
             organism.mutate_nonrecurrent(1, self.logger, self.generation_number)
@@ -41,7 +53,7 @@ class GeneticAlgorithm:
         self.__evaluate_population(self.population)
 
         all_scores = np.array([organism.fitness for organism in self.population])
-        if np.random.ranf() < self.hparams['prob_multiobjective']:
+        if self.rng.random() < self.hparams['prob_multiobjective']:
             all_scores = all_scores[:, [0, 1]]
         else:
             all_scores = all_scores[:, [0, 2]]
@@ -49,41 +61,8 @@ class GeneticAlgorithm:
         organism_index_rank = nsga_sort(all_scores)
         for i in range(len(organism_index_rank)):
             self.population[i].rank = organism_index_rank[i]
-        self.multi_objective_sort = True
 
         self.population.sort(key=operator.attrgetter('rank'))
-
-    def __generate_random_pop(self, count):
-        input_layer_size = self.problem_params['input_layer_size']
-        output_layer_size = self.problem_params['output_layer_size']
-        population = [Organism(input_layer_size,output_layer_size) for _ in range(count)]
-        for i in range(len(population)):
-            for _ in range(20):
-                population[i].mutate(self.hparams)
-        return population
-
-    def __create_good_starting_pop(self):
-        good_generated = 0
-        bar = progressbar.ProgressBar(max_value=len(self.population))
-        while good_generated < len(self.population):
-            random_pop = self.__generate_random_pop(max(len(self.population)-good_generated,50))
-            self.__evaluate_population(random_pop)
-            scores = [random_pop[i].fitness for i in range(len(random_pop))]
-
-            # score_buckets = np.linspace(-100, -200, 5)
-            # bucket_counts = [25, 250, 450, 250, 25]
-            score_buckets = [-400]
-            bucket_counts = [50]
-            bucket_remaining_cnt = bucket_counts
-            for i in range(len(random_pop)):
-                for bucket_index in range(len(score_buckets)):
-                    if scores[i][0] >= score_buckets[bucket_index]:
-                        if bucket_remaining_cnt[bucket_index] > 0 and good_generated < len(self.population):
-                            self.population[good_generated] = random_pop[i]
-                            good_generated += 1
-                            bucket_remaining_cnt[bucket_index] -= 1
-                            bar.update(good_generated)
-                        break
 
     def __create_offspring(self, parent_organisms, offspring_count):
         """
@@ -93,13 +72,13 @@ class GeneticAlgorithm:
         offspring = list()
 
         # Create a tournament for the first and second parent of size given in hparams
-        parent1_tournament = np.random.choice(parent_organisms, size=(offspring_count, self.hparams['tournament_size']))
-        parent2_tournament = np.random.choice(parent_organisms, size=(offspring_count, self.hparams['tournament_size']))
+        parent1_tournament = self.rng.choice(parent_organisms, size=(offspring_count, self.hparams['tournament_size']))
+        parent2_tournament = self.rng.choice(parent_organisms, size=(offspring_count, self.hparams['tournament_size']))
         # Organisms are already sorted so comparing by index is enough
         parents1 = parent1_tournament.min(axis=1)
         parents2 = parent2_tournament.min(axis=1)
         for i in range(offspring_count):
-            if np.random.ranf() < self.hparams['prob_mutate']:
+            if self.rng.random() < self.hparams['prob_mutate']:
                 organism_index = min(parents1[i], parents2[i])
                 new_organism = deepcopy(self.population[organism_index])
 
@@ -109,7 +88,6 @@ class GeneticAlgorithm:
                 parent2 = self.population[parent_indices[1]]
                 new_organism = parent1.crossover(parent2)
 
-            # for _ in range(max(5, math.ceil(self.hparams['mutate_amount'] * len(new_organism.gene_ids)))):
             new_organism.mutate(self.hparams, self.logger, self.generation_number)
             offspring.append(new_organism)
         return offspring
@@ -137,10 +115,6 @@ class GeneticAlgorithm:
     def step_generation(self):
         self.__get_stats()
 
-        debug_arr = np.array([o.fitness[0] for o in self.population])
-        if not np.all(np.diff(debug_arr) <= 0) and not self.multi_objective_sort:
-            print(debug_arr)
-            print('WARN: Population not sorted!')
         debug_arr = np.array([o.rank for o in self.population], dtype=int)
         if not np.all(np.diff(np.abs(debug_arr)) >= 0):
             print(debug_arr)
@@ -167,7 +141,7 @@ class GeneticAlgorithm:
         # all_scores[i][1] = max average reward
         # all_scores[i][2] = number of connections (genes)
         all_scores = np.array([organism.fitness for organism in self.population])
-        if np.random.ranf() < self.hparams['prob_multiobjective']:
+        if self.rng.random() < self.hparams['prob_multiobjective']:
             all_scores = all_scores[:, [0, 1]]
         else:
             all_scores = all_scores[:, [0, 2]]
@@ -175,7 +149,6 @@ class GeneticAlgorithm:
         organism_index_rank = nsga_sort(all_scores)
         for i in range(len(organism_index_rank)):
             self.population[i].rank = organism_index_rank[i]
-        self.multi_objective_sort = True
 
         self.population.sort(key=operator.attrgetter('rank'))
         if len(self.population) != self.hparams['population_size']:
