@@ -11,7 +11,7 @@ from utility.network_drawing_temp import draw_neural_net
 
 plt.ion()
 while True:
-    list_of_files = sorted(glob.glob('data/cartpole_swingup/recurrent wann run 2021_09_08 00_39_10/*'), key=os.path.getctime)
+    list_of_files = sorted(glob.glob('data/cartpole_swingup/recurrent wann run 2021_09_13 12_27_08/*'), key=os.path.getctime)
     #list_of_files = sorted(glob.glob('C:/Users/Ognjen/Desktop/Petnica-2021-82eade927a359af0f4e5a7cd820673f750fccd8a/data/cartpole_swingup/run 2021_08_21 20_01_22/*'), key=os.path.getctime)
     latest_file_name = list_of_files[-1]
     data_file = open(latest_file_name, 'rb')
@@ -46,6 +46,12 @@ while True:
         max_scores.append(max_score)
         max_max_scores.append(max_max_score)
         best_organisms.append(logger.logged_values['best_organism'][generation_number])
+
+    # good_nn = best_organisms[50].neural_net
+    #
+    # nn_file = open('data/temp/good_nn.pk1', 'wb+')
+    # pickle.dump(good_nn, nn_file, pickle.HIGHEST_PROTOCOL)
+    # nn_file.close()
 
     plt.cla()
     plt.plot(max_scores, c='blue', label='Max scores')

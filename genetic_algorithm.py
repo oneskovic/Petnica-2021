@@ -1,12 +1,14 @@
 from typing import List, Any, Union
 
 import numpy as np
+import pickle
 from organism import Organism
 from utility.nsga_sort import nsga_sort
 from copy import deepcopy
 from utility.logger import Logger
 import operator
 import math
+from recurrent_neural_network import NeuralNetwork
 from numpy.random import default_rng
 
 
@@ -30,6 +32,7 @@ class GeneticAlgorithm:
         input_layer_size = self.problem_params['input_layer_size']
         output_layer_size = self.problem_params['output_layer_size']
         self.population = [Organism(input_layer_size, output_layer_size, self.hparams['recurrent_nets'], self.rng) for _ in range(population_size)]
+
         for organism in self.population:
             nn = organism.neural_net
             if organism.recurrent:
@@ -37,7 +40,7 @@ class GeneticAlgorithm:
                 connection_cnt *= self.hparams['init_connection_fraction']
                 connection_cnt = int(connection_cnt)
                 for _ in range(connection_cnt):
-                    if self.rng.random() <= 0.5:
+                    if self.rng.random() <= self.hparams['init_connection_prob']:
                         organism.mutate_nonrecurrent(1, self.logger, self.generation_number)
             else:
                 for input_neuron in nn.input_neurons:

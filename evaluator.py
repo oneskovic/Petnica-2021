@@ -68,6 +68,7 @@ class Evaluator:
         for i in range(len(population_split)):
             population_part = population_split[i]
             mpi_comm.send(population_part, dest=i+1, tag=1)
+            mpi_comm.send(self.hparams, dest=i+1, tag=2)
 
         scores = np.zeros((1, self.get_objective_count()))
         for i in range(len(population_split)):
