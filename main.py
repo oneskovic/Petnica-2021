@@ -136,6 +136,7 @@ if thread_count == 1 or mpi_rank == 0:
         load_if_exists=True,
         pruner=optuna.pruners.HyperbandPruner(min_resource=20, max_resource=150, reduction_factor=3),
         sampler=optuna.samplers.TPESampler(),
+        direction='maximize'
     )
     study.optimize(objective, n_trials=num_trials)
 else:
