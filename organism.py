@@ -121,11 +121,13 @@ class Organism:
         Change actiavation function (with probability given in hparams).
         Assign species to None.
         """
-        mutation_id = self.rng.choice([0,1,2,3], p=[hparams['prob_mutate_add_neuron'],
-                                                     hparams['prob_mutate_add_connection'],
-                                                     hparams['prob_remove_connection'],
-                                                     hparams['prob_mutate_change_activation']])
+        probs = np.array([hparams['prob_mutate_add_neuron'], hparams['prob_mutate_add_connection'],
+                          hparams['prob_remove_connection'], hparams['prob_mutate_change_activation']])
+        if self.neural_net.neuron_count >= hparams['max_neurons']:
+            probs[0] = 0.0
+            probs /= probs.sum()
 
+        mutation_id = self.rng.choice([0, 1, 2, 3], p=probs)
         self.mutate_nonrecurrent(mutation_id, logger, generation_number)
 
     def crossover(self, other_parent):

@@ -66,19 +66,20 @@ def objective(trial):
         'population_size': 256,
         'init_connection_fraction': trial.suggest_float('init_connection_fraction', 0.0, 1.0),
         'init_connection_prob': trial.suggest_float('init_connection_prob', 0.0, 1.0),
-        'gene_coeff': 1.0,  # Weigh the importance of gene differences
-        'weight_coeff': 0.0,  # Weight agnostic, so leave at zero
+        'gene_coeff': 1.0,                      # Weigh the importance of gene differences
+        'weight_coeff': 0.0,                    # Weight agnostic, so leave at zero
         'prob_multiobjective': 0.8,
-        'prob_mutate': 1.0,  # Probability of mutation
-        'prob_mutate_add_neuron': p[0],  # If a mutation occurs the probability of adding a new neuron
-        'prob_mutate_add_connection': p[1],  # If a mutation occurs the probability of adding a new connection
+        'prob_mutate': 1.0,                     # Probability of mutation
+        'prob_mutate_add_neuron': p[0],         # If a mutation occurs the probability of adding a new neuron
+        'prob_mutate_add_connection': p[1],     # If a mutation occurs the probability of adding a new connection
         'prob_remove_connection': p[2],
         'prob_mutate_change_activation': p[3],  # If a mutation occurs the probability of changing a neuron activation
-        'dieoff_fraction': 0.2,  # The fraction of population that is discarded once sorted
-        'elite_fraction': 0.2,  # The fraction of population that is kept unchanged once sorted
-        'offspring_weighing': 'linear',  # Options: linear, exponential (1/x)
-        'tournament_size': 8,  # The size of tournament used in parent selection
+        'dieoff_fraction': 0.2,                 # The fraction of population that is discarded once sorted
+        'elite_fraction': 0.2,                  # The fraction of population that is kept unchanged once sorted
+        'offspring_weighing': 'linear',         # Options: linear, exponential (1/x)
+        'tournament_size': 8,                   # The size of tournament used in parent selection
         'eval_episodes': 3,
+        'max_neurons': 30,
         'eval_weights': [-2, -1, -0.5, 0.5, 1, 2],
         'thread_count': thread_count,
         'recurrent_nets': True,
