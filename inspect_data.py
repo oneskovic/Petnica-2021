@@ -9,14 +9,7 @@ from organism import Organism
 from evaluator import Evaluator
 from utility.network_drawing_temp import draw_neural_net
 
-plt.ion()
-while True:
-    list_of_files = sorted(glob.glob('data/cartpole_swingup/recurrent wann run 2021_09_13 12_27_08/*'), key=os.path.getctime)
-    #list_of_files = sorted(glob.glob('C:/Users/Ognjen/Desktop/Petnica-2021-82eade927a359af0f4e5a7cd820673f750fccd8a/data/cartpole_swingup/run 2021_08_21 20_01_22/*'), key=os.path.getctime)
-    latest_file_name = list_of_files[-1]
-    data_file = open(latest_file_name, 'rb')
-    logger = pickle.load(data_file)
-
+def plot_data(logger):
     evaluator = logger.logged_values['problem_params'][0]['evaluator']
     last_gen = list(logger.logged_values['best_organism'].keys())[-1]
     evaluator.hparams['eval_episodes'] = 1
@@ -53,14 +46,32 @@ while True:
     # pickle.dump(good_nn, nn_file, pickle.HIGHEST_PROTOCOL)
     # nn_file.close()
 
-    plt.cla()
     plt.plot(max_scores, c='blue', label='Max scores')
     plt.plot(avg_scores, c='red', label='Average scores')
     plt.plot(max_max_scores, c='green', label='Peak scores')
+
+
+
+list_of_folders = sorted(glob.glob('data\\cartpole_swingup\\*'), key=os.path.getctime, reverse=True)
+list_of_folders = [folder for folder in list_of_folders if len(glob.glob(folder + '\\*')) > 0]
+for start_ind in range(0,len(list_of_folders),16):
+
+    plt.cla()
+    folders = list_of_folders[start_ind:]
+
+    folders=['data/cartpole_swingup/recurrent wann run 2021_09_17 10_57_40']
+
+    for i in range(min(16,len(folders))):
+        list_of_files = sorted(glob.glob(folders[i]+'\\*'), key=os.path.getctime)
+
+        latest_file_name = list_of_files[-1]
+        data_file = open(latest_file_name, 'rb')
+        logger = pickle.load(data_file)
+        #plt.subplot(4,4,i+1)
+        plot_data(logger)
+
     ax = plt.gca()
     ax.legend()
     plt.show()
-    plt.pause(0.05)
-    time.sleep(0.3)
 
     #print(' ')

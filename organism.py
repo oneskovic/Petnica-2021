@@ -25,6 +25,7 @@ class Organism:
         self.fitness = None
         self.rank = None
         self.rng = rng
+        self.organism_id = rng.integers(0, np.iinfo(int).max)
 
         # for input_neuron in self.neural_net.get_input_neuron_indices():
         #     for output_neuron in self.neural_net.get_output_neuron_indices():

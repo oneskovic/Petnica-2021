@@ -138,22 +138,33 @@ class GeneticAlgorithm:
                                                 self.hparams['population_size']-elite_count)
 
         self.population = elite_organisms + new_organisms           # Join the elite population with the new population
+
+        prev_scores = np.array([org.fitness for org in new_organisms])
         self.__evaluate_population(self.population)
+        after_scores = np.array([org.fitness for org in new_organisms])
 
         # all_scores[i][0] = average reward
         # all_scores[i][1] = max average reward
         # all_scores[i][2] = number of connections (genes)
-        all_scores = np.array([organism.fitness for organism in self.population])
-        if self.rng.random() < self.hparams['prob_multiobjective']:
-            all_scores = all_scores[:, [0, 1]]
-        else:
-            all_scores = all_scores[:, [0, 2]]
+        # all_scores = np.array([organism.fitness for organism in self.population])
+        # if self.rng.random() < self.hparams['prob_multiobjective']:
+        #     all_scores = all_scores[:, [0, 1]]
+        # else:
+        #     all_scores = all_scores[:, [0, 2]]
+        #
+        # organism_index_rank = nsga_sort(all_scores)
+        # for i in range(len(organism_index_rank)):
+        #     self.population[i].rank = organism_index_rank[i]
 
-        organism_index_rank = nsga_sort(all_scores)
-        for i in range(len(organism_index_rank)):
-            self.population[i].rank = organism_index_rank[i]
+        # ----- Temp -----
+        for i in range(len(self.population)):
+            self.population[i].rank = self.population[i].fitness[1]
+        # ----- Temp -----
 
-        self.population.sort(key=operator.attrgetter('rank'))
+        #self.population.sort(key=operator.attrgetter('rank'))
+        # ----- Temp -----
+        self.population.sort(key=operator.attrgetter('rank'), reverse=True)
+        # ----- Temp -----
         if len(self.population) != self.hparams['population_size']:
             raise ValueError('Incorrect population size!')
         self.generation_number += 1

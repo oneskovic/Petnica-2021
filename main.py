@@ -130,17 +130,45 @@ mpi_rank = mpi_comm.Get_rank()
 
 if thread_count == 1 or mpi_rank == 0:
     if thread_count > 1:
-        print(f'Master at: {os.getpid()}')
-    study = optuna.create_study(
-        study_name='recurrent-wann-cartpole',
-        storage='mysql://89.216.80.18:3306/recurrent-wann1-hparams',
-        load_if_exists=True,
-        pruner=optuna.pruners.HyperbandPruner(min_resource=20, max_resource=150, reduction_factor=3),
-        sampler=optuna.samplers.TPESampler(),
-        direction='maximize'
-    )
-    study.optimize(objective, n_trials=num_trials)
+        print(f'Master at: {os.getpid()}', flush=True)
+        time.sleep(10)
+    # study = optuna.create_study(
+    #     study_name='recurrent-wann-cartpole',
+    #     storage='mysql://89.216.80.18:3306/recurrent-wann1-hparams',
+    #     load_if_exists=True,
+    #     pruner=optuna.pruners.HyperbandPruner(min_resource=20, max_resource=150, reduction_factor=3),
+    #     sampler=optuna.samplers.TPESampler(),
+    #     direction='maximize'
+    # )
+    # study.optimize(objective, n_trials=num_trials)
+
+    hparams = {
+        'population_size': 256,
+        'init_connection_fraction': 0.5,
+        'init_connection_prob': 0.5,
+        'gene_coeff': 1.0,  # Weigh the importance of gene differences
+        'weight_coeff': 0.0,  # Weight agnostic, so leave at zero
+        'prob_multiobjective': 0.8,
+        'prob_mutate': 1.0,  # Probability of mutation
+        'prob_mutate_add_neuron': 0.25,  # If a mutation occurs the probability of adding a new neuron
+        'prob_mutate_add_connection': 0.125,  # If a mutation occurs the probability of adding a new connection
+        'prob_remove_connection': 0.125,
+        'prob_mutate_change_activation': 0.5,  # If a mutation occurs the probability of changing a neuron activation
+        'dieoff_fraction': 0.2,  # The fraction of population that is discarded once sorted
+        'elite_fraction': 0.2,  # The fraction of population that is kept unchanged once sorted
+        'offspring_weighing': 'linear',  # Options: linear, exponential (1/x)
+        'tournament_size': 8,  # The size of tournament used in parent selection
+        'eval_episodes': 3,
+        'max_neurons': 23,
+        'eval_weights': [-2, -1, -0.5, 0.5, 1, 2],
+        'thread_count': thread_count,
+        'recurrent_nets': True,
+        'random_seed': np.random.randint(np.iinfo(int).max)
+    }
+    train(hparams)
+
 else:
+    print(f'Slave at {os.getpid()}', flush=True)
     while True:
         population_to_eval = mpi_comm.recv(source=0, tag=1)
         hparams = mpi_comm.recv(source=0, tag=2)
